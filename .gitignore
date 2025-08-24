@@ -11,3 +11,5 @@ venv/
 .vscode/
 # macOS
 .DS_Store
+# DeepEval
+.deepeval/
