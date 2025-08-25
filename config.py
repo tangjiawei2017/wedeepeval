@@ -68,6 +68,8 @@ GENERATION_CONFIG = {
     'max_tokens': int(os.getenv('GENERATION_MAX_TOKENS', 2000)),  # 最大token数
     'single_batch_threshold': int(os.getenv('SINGLE_BATCH_THRESHOLD', 10)),  # 单批生成阈值
     'max_single_batch_size': int(os.getenv('MAX_SINGLE_BATCH_SIZE', 15)),  # 单批最大生成数量
+    # 设置为 true 将禁用所有分批逻辑，直接按 Web 请求数量全量生成
+    'disable_batching': os.getenv('DISABLE_BATCHING', 'true').lower() == 'true',
 }
 
 # 打印当前环境信息

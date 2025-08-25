@@ -67,23 +67,12 @@ class DeepEvalDatasetGenerator:
         )
     
     def _calculate_batch_strategy(self, num_questions: int) -> Dict:
-        """计算分批生成策略"""
-        if num_questions <= GENERATION_CONFIG['single_batch_threshold']:
-            # 小数量：一次性生成
-            return {
-                'strategy': 'single_batch',
-                'batch_size': min(num_questions, GENERATION_CONFIG['max_single_batch_size']),
-                'num_batches': 1
-            }
-        else:
-            # 大数量：分批生成
-            batch_size = GENERATION_CONFIG['batch_size']
-            num_batches = (num_questions + batch_size - 1) // batch_size
-            return {
-                'strategy': 'multi_batch',
-                'batch_size': batch_size,
-                'num_batches': num_batches
-            }
+        """保持兼容但不再使用分批，统一返回单批全量。"""
+        return {
+            'strategy': 'single_batch',
+            'batch_size': num_questions,
+            'num_batches': 1
+        }
     
     async def generate_from_contexts(
         self, 
@@ -106,160 +95,77 @@ class DeepEvalDatasetGenerator:
         """
         try:
             logger.info(f"开始使用DeepEval生成数据集: 上下文数量={len(contexts)}, 问题数量={num_questions}")
-            
-            # 计算分批策略
-            strategy = self._calculate_batch_strategy(num_questions)
-            logger.info(f"使用生成策略: {strategy['strategy']}, 批次大小: {strategy['batch_size']}, 总批次数: {strategy['num_batches']}")
-            
-            # 准备上下文
+
+            # 一次性全量生成（无分批）
             contexts_with_instruction = self._prepare_contexts_with_instruction(contexts)
-            
-            # 创建风格配置
             styling_config = self._create_styling_config(scenario)
-            
-            all_qa_items = []
-            completed_count = 0
-            
-            # 分批生成
-            for batch_num in range(strategy['num_batches']):
-                batch_start = batch_num * strategy['batch_size']
-                batch_end = min(batch_start + strategy['batch_size'], num_questions)
-                current_batch_size = batch_end - batch_start
-                
-                logger.info(f"生成第 {batch_num + 1}/{strategy['num_batches']} 批，数量: {current_batch_size}")
-                
-                # 更新进度
-                if progress_callback:
-                    progress_callback(completed_count, num_questions, f"正在生成第 {batch_num + 1} 批...")
-                
-                # 计算当前批次每个上下文生成的问题数量
-                max_goldens_per_context = max(1, current_batch_size // len(contexts_with_instruction))
-                
-                try:
-                    # 使用DeepEval生成当前批次
-                    dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                        contexts=contexts_with_instruction,
-                        include_expected_output=True,
-                        max_goldens_per_context=max_goldens_per_context
-                    )
-                    
-                    # 转换为我们的格式
-                    batch_items = []
-                    for golden in dataset:
-                        qa_item = {
-                            'question': golden.input,
-                            'expected_output': golden.expected_output,
-                            'context': contexts,
-                            'context_length': sum(len(x) for x in contexts)
-                        }
-                        batch_items.append(qa_item)
-                    
-                    # 去重处理
-                    new_items = []
-                    existing_questions = set(item['question'] for item in all_qa_items)
-                    
-                    for item in batch_items:
-                        if item['question'] not in existing_questions:
-                            new_items.append(item)
-                            existing_questions.add(item['question'])
-                        else:
-                            logger.warning(f"发现重复问题，跳过: {item['question'][:50]}...")
-                    
-                    # 添加到总列表
-                    all_qa_items.extend(new_items)
-                    completed_count += len(new_items)
-                    
-                    logger.info(f"第 {batch_num + 1} 批完成，生成了 {len(new_items)} 个问答对")
-                    logger.info(f"总进度: {completed_count}/{num_questions} ({completed_count/num_questions*100:.1f}%)")
-                    
-                    # 更新进度
-                    if progress_callback:
-                        progress_callback(completed_count, num_questions, f"第 {batch_num + 1} 批完成")
-                    
-                    # 如果已经达到目标数量，提前结束
-                    if completed_count >= num_questions:
-                        break
-                        
-                except Exception as e:
-                    logger.error(f"第 {batch_num + 1} 批生成失败: {str(e)}")
-                    if progress_callback:
-                        progress_callback(completed_count, num_questions, f"第 {batch_num + 1} 批失败: {str(e)}")
-                    # 继续下一批，不中断整个任务
-                    continue
-            
-            # 如果生成的问答对数量不足，继续生成直到达到目标数量
-            if len(all_qa_items) < num_questions:
-                logger.warning(f"生成的问答对数量不足 ({len(all_qa_items)}/{num_questions})，继续生成")
-                
-                if progress_callback:
-                    progress_callback(completed_count, num_questions, "继续生成补充数据...")
-                
-                # 继续生成直到达到目标数量
-                while len(all_qa_items) < num_questions:
-                    remaining = num_questions - len(all_qa_items)
-                    current_batch_size = min(strategy['batch_size'], remaining)
-                    
-                    logger.info(f"继续生成，剩余 {remaining} 个，本批生成 {current_batch_size} 个")
-                    
+
+            if progress_callback:
+                progress_callback(0, num_questions, "开始全量生成...")
+
+            # 挂载外部进度钩子，将 rich 进度更新透传到回调
+            prev_hook = None
+            try:
+                import deepeval.utils as dutils
+
+                prev_hook = getattr(dutils, 'EXTERNAL_PROGRESS_HOOK', None)
+
+                def _hook(event: dict):
                     try:
-                        # 使用DeepEval继续生成
-                        dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                            contexts=contexts_with_instruction,
-                            include_expected_output=True,
-                            max_goldens_per_context=max(1, current_batch_size // len(contexts_with_instruction))
-                        )
-                        
-                        # 转换为我们的格式
-                        batch_items = []
-                        for golden in dataset:
-                            qa_item = {
-                                'question': golden.input,
-                                'expected_output': golden.expected_output,
-                                'context': contexts,
-                                'context_length': sum(len(x) for x in contexts)
-                            }
-                            batch_items.append(qa_item)
-                        
-                        # 去重处理
-                        new_items = []
-                        existing_questions = set(item['question'] for item in all_qa_items)
-                        
-                        for item in batch_items:
-                            if item['question'] not in existing_questions:
-                                new_items.append(item)
-                                existing_questions.add(item['question'])
-                            else:
-                                logger.warning(f"发现重复问题，跳过: {item['question'][:50]}...")
-                        
-                        all_qa_items.extend(new_items)
-                        completed_count += len(new_items)
-                        
-                        logger.info(f"继续生成完成，新增 {len(new_items)} 个问答对")
-                        logger.info(f"总进度: {completed_count}/{num_questions} ({completed_count/num_questions*100:.1f}%)")
-                        
-                        # 更新进度
+                        desc = (event.get('description') or '').lower()
+                        # 只拦截主进度条，避免加载/切分等子任务干扰
+                        if not (
+                            'generating goldens from context' in desc
+                            or 'generating input' in desc
+                            or 'generate goldens' in desc
+                        ):
+                            return
+                        raw_completed = int(event.get('completed') or 0)
+                        raw_total = int((event.get('total') or 0) or 1)
+                        ratio = max(0.0, min(1.0, (raw_completed / raw_total)))
+                        mapped_completed = int(min(num_questions, max(0, int(ratio * num_questions))))
+                        status = event.get('description') or "生成中"
+                        logger.info(f"[progress_hook] {status} raw={raw_completed}/{raw_total} -> mapped={mapped_completed}/{num_questions}")
                         if progress_callback:
-                            progress_callback(completed_count, num_questions, f"继续生成完成，新增 {len(new_items)} 个")
-                        
-                        if len(new_items) == 0:
-                            logger.warning("本批没有生成新的问答对，可能达到生成上限")
-                            break
-                            
-                    except Exception as e:
-                        logger.error(f"继续生成失败: {str(e)}")
-                        if progress_callback:
-                            progress_callback(completed_count, num_questions, f"继续生成失败: {str(e)}")
-                        break
-            
-            # 只取需要的数量
-            final_items = all_qa_items[:num_questions]
-            
+                            progress_callback(mapped_completed, num_questions, status)
+                    except Exception:
+                        pass
+
+                dutils.EXTERNAL_PROGRESS_HOOK = _hook
+
+                max_goldens_per_context = max(1, num_questions)
+                dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
+                    contexts=contexts_with_instruction,
+                    include_expected_output=True,
+                    max_goldens_per_context=max_goldens_per_context
+                )
+            finally:
+                try:
+                    import deepeval.utils as dutils
+                    dutils.EXTERNAL_PROGRESS_HOOK = prev_hook
+                except Exception:
+                    pass
+
+            qa_items = []
+            seen = set()
+            for golden in dataset:
+                q = golden.input
+                if q in seen:
+                    continue
+                seen.add(q)
+                qa_items.append({
+                    'question': q,
+                    'expected_output': golden.expected_output,
+                    'context': contexts,
+                    'context_length': sum(len(x) for x in contexts)
+                })
+
+            final_items = qa_items[:num_questions]
             logger.info(f"DeepEval生成完成，总共生成了 {len(final_items)} 个问答对")
-            
-            # 最终进度更新
+
             if progress_callback:
                 progress_callback(len(final_items), num_questions, "生成完成")
-            
+
             return final_items
             
         except Exception as e:

@@ -27,5 +27,28 @@ fi
 
 echo "✅ 使用配置文件: env.$ENV"
 
-# 启动应用
-python3 main.py 
+# 确保日志目录存在
+mkdir -p logs
+
+# 启动应用（后台运行）
+nohup python3 main.py > logs/app.log 2>&1 &
+
+# 获取后台进程ID
+PID=$!
+
+# 等待一秒检查进程是否启动成功
+sleep 1
+
+# 检查进程是否还在运行
+if kill -0 $PID 2>/dev/null; then
+    echo "✅ 服务已成功启动，进程ID: $PID"
+    echo "📝 日志文件: logs/app.log"
+    echo "🌐 服务地址: http://localhost:8092"
+    echo "📚 API文档: http://localhost:8092/docs"
+    echo ""
+    echo "💡 停止服务请运行: ./sh/stop.sh"
+    echo "💡 查看日志请运行: tail -f logs/app.log"
+else
+    echo "❌ 服务启动失败，请检查日志: logs/app.log"
+    exit 1
+fi 
