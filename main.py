@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.datasets import router as datasets_router
 from routers.tasks import router as tasks_router
+from database import create_tables
 import uvicorn
 from config import SERVER_CONFIG, BASE_CONFIG
 from utils.logger import get_logger
@@ -34,6 +35,9 @@ async def root():
 
 
 if __name__ == "__main__":
+    # 创建数据库表
+    create_tables()
+    
     logger.info(f"启动服务器: {SERVER_CONFIG['host']}:{SERVER_CONFIG['port']}")
     uvicorn.run(
         "main:app", 

@@ -37,7 +37,7 @@ def setup_logger(name: str = 'wedeepeval') -> logging.Logger:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # 文件处理器 - 按日期轮转，统一使用 wedeepeval 作为文件名
+    # 文件处理器 - 只使用一个日志文件
     today = datetime.now().strftime('%Y-%m-%d')
     log_file = os.path.join(log_dir, f'wedeepeval_{today}.log')
     
@@ -50,18 +50,6 @@ def setup_logger(name: str = 'wedeepeval') -> logging.Logger:
     file_handler.setLevel(getattr(logging, LOG_CONFIG['log_level'].upper()))
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    
-    # 错误日志文件处理器 - 统一使用 wedeepeval_error 作为文件名
-    error_log_file = os.path.join(log_dir, f'wedeepeval_error_{today}.log')
-    error_handler = logging.handlers.RotatingFileHandler(
-        error_log_file,
-        maxBytes=LOG_CONFIG['max_bytes'],
-        backupCount=LOG_CONFIG['backup_count'],
-        encoding=LOG_CONFIG['encoding']
-    )
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(formatter)
-    logger.addHandler(error_handler)
     
     return logger
 

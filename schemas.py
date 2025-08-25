@@ -39,3 +39,19 @@ class TopicResponse(BaseModel):
 class AugmentResponse(BaseModel):
     items: List[AugmentDatasetResponseItem]
 
+
+class TaskResponse(BaseModel):
+    id: int
+    task_name: str
+    generation_type: str
+    status: str
+    total_items: int
+    completed_items: int
+    output_file_path: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    error_message: Optional[str] = None
+    input_content: Optional[str] = None
+    
+    class Config:
+        from_attributes = True 

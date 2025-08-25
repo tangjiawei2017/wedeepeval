@@ -5,3 +5,5 @@ python-multipart==0.0.9
 openai==1.99.9
 mysql-connector-python==8.2.0
 python-dotenv==1.0.0
+sqlalchemy==2.0.40
+# deepeval==3.4.0  # 已卸载系统包，使用本地源码

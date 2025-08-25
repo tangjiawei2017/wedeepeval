@@ -7,11 +7,12 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi import HTTPException
-from database import db_manager, generate_task_name
+from database import TaskManager
+from datetime import datetime
 from config import FILE_CONFIG
 from utils.deepeval_generator import deepeval_generator
 from utils.logger import get_logger
-from models import (
+from schemas import (
     QAItem,
     FromContextRequest,
     FromTopicRequest,
@@ -26,6 +27,14 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 # 获取日志记录器
 logger = get_logger('datasets')
+
+# 创建任务管理器实例
+task_manager = TaskManager()
+
+def generate_task_name(generation_type: str) -> str:
+    """生成任务名称"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M")
+    return f"generation_datasets_from_{generation_type}_{timestamp}"
 
 def write_qa_to_csv(items: List[QAItem]) -> str:
     """将问答对写入CSV格式"""
@@ -93,11 +102,15 @@ async def generate_from_context(payload: FromContextRequest):
         # 生成任务名称
         task_name = generate_task_name("context")
 
+        # 准备输入内容
+        input_content = f"上下文数量: {len(payload.contexts)}\n上下文内容:\n" + "\n".join([f"- {ctx[:100]}{'...' if len(ctx) > 100 else ''}" for ctx in payload.contexts])
+        
         # 创建任务
-        task_id = db_manager.create_task(
+        task_id = task_manager.create_task(
             task_name=task_name,
             generation_type="context",
-            total_items=payload.num_questions
+            total_items=payload.num_questions,
+            input_content=input_content
         )
 
         if not task_id:
@@ -131,7 +144,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
 
     try:
         # 更新任务状态为运行中
-        db_manager.update_task_status(task_id, "running")
+        task_manager.update_task_status(task_id, "running")
 
         logger.info(f"使用DeepEval生成数据集: 上下文数量={len(payload.contexts)}, 问题数量={payload.num_questions}")
 
@@ -139,7 +152,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
         def progress_callback(completed: int, total: int, status: str):
             """进度回调函数，更新数据库中的任务进度"""
             try:
-                db_manager.update_task_status(
+                task_manager.update_task_status(
                     task_id, 
                     "running", 
                     completed_items=completed
@@ -187,9 +200,9 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
             f.write(csv_content)
 
         # 更新任务状态为完成
-        db_manager.update_task_status(
-            task_id,
-            "completed",
+        task_manager.update_task_status(
+            task_id, 
+            "completed", 
             completed_items=len(final_items),
             output_file_path=output_path
         )
@@ -199,7 +212,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
     except Exception as e:
         # 如果处理失败，更新任务状态为失败
         logger.error(f"任务 {task_id} 处理失败: {str(e)}")
-        db_manager.update_task_status(
+        task_manager.update_task_status(
             task_id,
             "failed",
             error_message=f"任务处理失败: {str(e)}"
