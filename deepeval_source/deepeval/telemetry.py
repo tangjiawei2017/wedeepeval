@@ -338,6 +338,49 @@ def capture_conversation_simulator_run(num_conversations: int):
 
 
 @contextmanager
+def capture_red_teamer_run(
+    attacks_per_vulnerability_type: int,
+    vulnerabilities: List[str],
+    attack_enhancements: Dict,
+):
+    if telemetry_opt_out():
+        yield
+    else:
+        # data
+        event = "Invoked redteamer"
+        distinct_id = get_unique_id()
+        # capture posthog
+        posthog.capture(
+            distinct_id=distinct_id,
+            event=event,
+        )
+        # capture new relic
+        with tracer.start_as_current_span(event) as span:
+            # if anonymous_public_ip:
+            #     span.set_attribute("user.public_ip", anonymous_public_ip)
+            # span.set_attribute("logged_in_with", get_logged_in_with())
+            # span.set_attribute("environment", IS_RUNNING_IN_JUPYTER)
+            # span.set_attribute("user.status", get_status())
+            # span.set_attribute("user.unique_id", get_unique_id())
+            # span.set_attribute(
+            #     "feature_status.redteaming",
+            #     get_feature_status(Feature.REDTEAMING),
+            # )
+            # span.set_attribute(
+            #     "attacks_per_vulnerability", attacks_per_vulnerability_type
+            # )
+            # for vuln in vulnerabilities:
+            #     for types in vuln.get_types():
+            #         span.set_attribute(f"vulnerability.{types.value}", 1)
+            # for enhancement, value in attack_enhancements.items():
+            #     span.set_attribute(
+            #         f"attack_enhancement.{enhancement.value}", value
+            #     )
+            # set_last_feature(Feature.REDTEAMING)
+            yield span
+
+
+@contextmanager
 def capture_guardrails(guards: List[str]):
     if telemetry_opt_out():
         yield
@@ -517,12 +560,11 @@ def capture_send_trace():
 
 
 # tracing integration
-@contextmanager
 def capture_tracing_integration(integration_name: str):
     if telemetry_opt_out():
         yield
     else:
-        event = f"Tracing Integration: deepeval.integrations.{integration_name}"
+        event = f"Tracing Integration: {integration_name}"
         distinct_id = get_unique_id()
         properties = {
             "logged_in_with": get_logged_in_with(),
@@ -546,8 +588,6 @@ def capture_tracing_integration(integration_name: str):
         with tracer.start_as_current_span(event) as span:
             for property, value in properties.items():
                 span.set_attribute(property, value)
-            # OTEL/New Relic filtering attributes
-            span.set_attribute("integration.name", integration_name)
             yield span
 
 
@@ -560,7 +600,7 @@ def read_telemetry_file() -> dict:
     """Reads the telemetry data file and returns the key-value pairs as a dictionary."""
     if not os.path.exists(TELEMETRY_PATH):
         return {}
-    with open(TELEMETRY_PATH, "r") as file:
+    with open(TELEMETRY_PATH, "r", errors="ignore") as file:
         lines = file.readlines()
     data = {}
     for line in lines:

@@ -1,13 +1,12 @@
 from typing import Optional, List, Dict, Union, Type
 import os
+import re
 
 from deepeval.models.base_model import DeepEvalBaseEmbeddingModel
 
 # check langchain availability
 try:
     from langchain_core.documents import Document as LCDocument
-    from langchain_text_splitters import TokenTextSplitter
-    from langchain_text_splitters.base import TextSplitter
     from langchain_community.document_loaders import (
         PyPDFLoader,
         TextLoader,
@@ -43,6 +42,64 @@ def _check_langchain_available():
         raise ImportError(
             "langchain, langchain_community, and langchain_text_splitters are required for this functionality. Install it via your package manager"
         )
+
+
+class CustomTextSplitter:
+    """Custom text splitter that provides more control over chunking process"""
+    
+    def __init__(self, chunk_size: int = 1024, chunk_overlap: int = 0):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+    
+    def split_text(self, text: str) -> List[str]:
+        """Split text into chunks based on character count"""
+        if not text:
+            return []
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            # Calculate end position for current chunk
+            end = start + self.chunk_size
+            
+            # If this is not the first chunk, include overlap
+            if start > 0 and self.chunk_overlap > 0:
+                start = max(0, start - self.chunk_overlap)
+            
+            # Extract chunk
+            chunk = text[start:end]
+            chunks.append(chunk)
+            
+            # Move to next chunk
+            start = end
+            
+            # If we've reached the end, break
+            if end >= len(text):
+                break
+        
+        return chunks
+    
+    def split_documents(self, documents: List[LCDocument]) -> List[LCDocument]:
+        """Split documents into chunks"""
+        split_docs = []
+        
+        for doc in documents:
+            text_chunks = self.split_text(doc.page_content)
+            
+            for i, chunk in enumerate(text_chunks):
+                # Create new document for each chunk
+                new_doc = LCDocument(
+                    page_content=chunk,
+                    metadata={
+                        **doc.metadata,
+                        "chunk_index": i,
+                        "total_chunks": len(text_chunks)
+                    }
+                )
+                split_docs.append(new_doc)
+        
+        return split_docs
 
 
 class DocumentChunker:
@@ -91,8 +148,10 @@ class DocumentChunker:
         try:
             collection = client.get_collection(name=collection_name)
         except Exception:
-            text_splitter: TextSplitter = TokenTextSplitter(
-                chunk_size=chunk_size, chunk_overlap=chunk_overlap
+            # Use custom text splitter instead of TokenTextSplitter
+            text_splitter = CustomTextSplitter(
+                chunk_size=chunk_size, 
+                chunk_overlap=chunk_overlap
             )
             # Collection doesn't exist, so create it and then add documents
             collection = client.create_collection(name=collection_name)
@@ -138,8 +197,10 @@ class DocumentChunker:
         try:
             collection = client.get_collection(name=collection_name)
         except Exception:
-            text_splitter: TextSplitter = TokenTextSplitter(
-                chunk_size=chunk_size, chunk_overlap=chunk_overlap
+            # Use custom text splitter instead of TokenTextSplitter
+            text_splitter = CustomTextSplitter(
+                chunk_size=chunk_size, 
+                chunk_overlap=chunk_overlap
             )
             # Collection doesn't exist, so create it and then add documents
             collection = client.create_collection(name=collection_name)
@@ -199,6 +260,13 @@ class DocumentChunker:
         self.text_token_count = self.count_tokens(self.sections)
         self.source_file = path
 
-    def count_tokens(self, chunks: List["LCDocument"]):
-        counter = TokenTextSplitter(chunk_size=1, chunk_overlap=0)
-        return len(counter.split_documents(chunks))
+    def count_tokens(self, chunks: List["LCDocument"]) -> int:
+        """Custom token counting method using character-based approximation"""
+        total_chars = 0
+        for chunk in chunks:
+            total_chars += len(chunk.page_content)
+        
+        # Approximate tokens as characters / 4 (rough estimate)
+        # You can adjust this ratio based on your specific needs
+        estimated_tokens = total_chars // 4
+        return estimated_tokens
