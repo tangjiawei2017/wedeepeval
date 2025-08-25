@@ -1,0 +1,201 @@
+2025-08-25 09:46:15 - database - INFO - 数据库连接成功
+2025-08-25 09:46:16 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:46:51 - database - INFO - 数据库连接成功
+2025-08-25 09:46:52 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:46:54 - database - INFO - 数据库连接成功
+2025-08-25 09:46:54 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:48:01 - database - INFO - 数据库连接成功
+2025-08-25 09:48:02 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:48:04 - database - INFO - 数据库连接成功
+2025-08-25 09:48:05 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:48:53 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:48:56 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:50:36 - models - INFO - 数据库表创建成功
+2025-08-25 09:50:42 - database_orm - ERROR - 创建任务失败: (mysql.connector.errors.DatabaseError) 1265 (01000): Data truncated for column 'generation_type' at row 1
+[SQL: INSERT INTO generation_tasks (task_name, generation_type, status, total_items, completed_items, output_file_path, input_content, error_message, created_at, updated_at) VALUES (%(task_name)s, %(generation_type)s, %(status)s, %(total_items)s, %(completed_items)s, %(output_file_path)s, %(input_content)s, %(error_message)s, %(created_at)s, %(updated_at)s)]
+[parameters: {'task_name': 'test_orm_task', 'generation_type': 'test', 'status': 'pending', 'total_items': 5, 'completed_items': 0, 'output_file_path': None, 'input_content': '这是测试输入内容', 'error_message': None, 'created_at': datetime.datetime(2025, 8, 25, 9, 50, 42, 858800), 'updated_at': datetime.datetime(2025, 8, 25, 9, 50, 42, 858803)}]
+(Background on this error at: https://sqlalche.me/e/20/4xp6)
+2025-08-25 09:50:42 - database_orm - ERROR - 任务不存在: ID=None
+2025-08-25 09:50:42 - database_orm - WARNING - 任务不存在: ID=None
+2025-08-25 09:50:42 - database_orm - INFO - 获取任务列表成功，共 28 个任务
+2025-08-25 09:51:04 - database_orm - INFO - 创建任务成功: test_orm_task, ID: 29
+2025-08-25 09:51:04 - database_orm - INFO - 更新任务状态: ID=29, status=running, completed=2
+2025-08-25 09:51:04 - database_orm - INFO - 获取任务成功: ID=29
+2025-08-25 09:57:22 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:30 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:33 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:43 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:43 - datasets - INFO - 上下文生成请求: 上下文数量=1, 问题数量=3
+2025-08-25 09:57:43 - database_orm - INFO - 创建任务成功: generation_datasets_from_context_202508250957, ID: 30
+2025-08-25 09:57:43 - datasets - INFO - 上下文生成任务已创建: ID=30, 名称=generation_datasets_from_context_202508250957
+2025-08-25 09:57:43 - datasets - INFO - 开始处理上下文生成任务: ID=30
+2025-08-25 09:57:43 - database_orm - INFO - 更新任务状态: ID=30, status=running, completed=None
+2025-08-25 09:57:43 - datasets - INFO - 使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 09:57:43 - deepeval_generator - INFO - 开始使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 09:57:43 - deepeval_generator - INFO - 使用生成策略: single_batch, 批次大小: 3, 总批次数: 1
+2025-08-25 09:57:43 - deepeval_generator - INFO - 生成第 1/1 批，数量: 3
+2025-08-25 09:57:43 - database_orm - INFO - 更新任务状态: ID=30, status=running, completed=0
+2025-08-25 09:57:43 - datasets - INFO - 任务 30 进度: 0/3 (0.0%) - 正在生成第 1 批...
+2025-08-25 09:57:48 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:54 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:57:54 - models - INFO - 数据库表创建成功
+2025-08-25 09:57:54 - main - INFO - 启动服务器: 0.0.0.0:8092
+2025-08-25 09:58:04 - datasets - INFO - 上下文生成请求: 上下文数量=1, 问题数量=3
+2025-08-25 09:58:04 - database_orm - INFO - 创建任务成功: generation_datasets_from_context_202508250958, ID: 31
+2025-08-25 09:58:04 - datasets - INFO - 上下文生成任务已创建: ID=31, 名称=generation_datasets_from_context_202508250958
+2025-08-25 09:58:04 - datasets - INFO - 开始处理上下文生成任务: ID=31
+2025-08-25 09:58:04 - database_orm - INFO - 更新任务状态: ID=31, status=running, completed=None
+2025-08-25 09:58:04 - datasets - INFO - 使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 09:58:04 - deepeval_generator - INFO - 开始使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 09:58:04 - deepeval_generator - INFO - 使用生成策略: single_batch, 批次大小: 3, 总批次数: 1
+2025-08-25 09:58:04 - deepeval_generator - INFO - 生成第 1/1 批，数量: 3
+2025-08-25 09:58:04 - database_orm - INFO - 更新任务状态: ID=31, status=running, completed=0
+2025-08-25 09:58:04 - datasets - INFO - 任务 31 进度: 0/3 (0.0%) - 正在生成第 1 批...
+2025-08-25 09:58:05 - deepeval_generator - INFO - 第 1 批完成，生成了 3 个问答对
+2025-08-25 09:58:05 - deepeval_generator - INFO - 总进度: 3/3 (100.0%)
+2025-08-25 09:58:05 - database_orm - INFO - 更新任务状态: ID=30, status=running, completed=3
+2025-08-25 09:58:05 - datasets - INFO - 任务 30 进度: 3/3 (100.0%) - 第 1 批完成
+2025-08-25 09:58:05 - deepeval_generator - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 09:58:05 - database_orm - INFO - 更新任务状态: ID=30, status=running, completed=3
+2025-08-25 09:58:05 - datasets - INFO - 任务 30 进度: 3/3 (100.0%) - 生成完成
+2025-08-25 09:58:05 - datasets - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 09:58:05 - database_orm - INFO - 更新任务状态: ID=30, status=completed, completed=3
+2025-08-25 09:58:05 - datasets - INFO - 任务 30 完成，生成了 3 个问答对，文件保存至: /tmp/context_qa_dataset_20250825_095805.csv
+2025-08-25 09:58:15 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 09:58:15 - models - INFO - 数据库表创建成功
+2025-08-25 09:58:15 - main - INFO - 启动服务器: 0.0.0.0:8092
+2025-08-25 09:58:26 - deepeval_generator - INFO - 第 1 批完成，生成了 3 个问答对
+2025-08-25 09:58:26 - deepeval_generator - INFO - 总进度: 3/3 (100.0%)
+2025-08-25 09:58:26 - database_orm - INFO - 更新任务状态: ID=31, status=running, completed=3
+2025-08-25 09:58:26 - datasets - INFO - 任务 31 进度: 3/3 (100.0%) - 第 1 批完成
+2025-08-25 09:58:26 - deepeval_generator - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 09:58:26 - database_orm - INFO - 更新任务状态: ID=31, status=running, completed=3
+2025-08-25 09:58:26 - datasets - INFO - 任务 31 进度: 3/3 (100.0%) - 生成完成
+2025-08-25 09:58:26 - datasets - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 09:58:26 - database_orm - INFO - 更新任务状态: ID=31, status=completed, completed=3
+2025-08-25 09:58:26 - datasets - INFO - 任务 31 完成，生成了 3 个问答对，文件保存至: /tmp/context_qa_dataset_20250825_095826.csv
+2025-08-25 09:58:28 - database_orm - INFO - 获取任务成功: ID=31
+2025-08-25 09:58:48 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:00:14 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:00:16 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:01:50 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:02 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:04 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:24 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:26 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:28 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:33 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:34 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:02:52 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:21 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:23 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:32 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:34 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:48 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:50 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:03:56 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:04:04 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:04:21 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:04:30 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:04:41 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:04:48 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:09 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:15 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:17 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:21 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:32 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:50 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:05:50 - database - INFO - 数据库表创建成功
+2025-08-25 10:05:50 - main - INFO - 启动服务器: 0.0.0.0:8092
+2025-08-25 10:06:00 - datasets - INFO - 上下文生成请求: 上下文数量=1, 问题数量=3
+2025-08-25 10:06:01 - task_manager - INFO - 创建任务成功: generation_datasets_from_context_202508251006, ID: 32
+2025-08-25 10:06:01 - datasets - INFO - 上下文生成任务已创建: ID=32, 名称=generation_datasets_from_context_202508251006
+2025-08-25 10:06:01 - datasets - INFO - 开始处理上下文生成任务: ID=32
+2025-08-25 10:06:01 - task_manager - INFO - 更新任务状态: ID=32, status=running, completed=None
+2025-08-25 10:06:01 - datasets - INFO - 使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 10:06:01 - deepeval_generator - INFO - 开始使用DeepEval生成数据集: 上下文数量=1, 问题数量=3
+2025-08-25 10:06:01 - deepeval_generator - INFO - 使用生成策略: single_batch, 批次大小: 3, 总批次数: 1
+2025-08-25 10:06:01 - deepeval_generator - INFO - 生成第 1/1 批，数量: 3
+2025-08-25 10:06:01 - task_manager - INFO - 更新任务状态: ID=32, status=running, completed=0
+2025-08-25 10:06:01 - datasets - INFO - 任务 32 进度: 0/3 (0.0%) - 正在生成第 1 批...
+2025-08-25 10:06:26 - task_manager - INFO - 获取任务成功: ID=32
+2025-08-25 10:06:32 - deepeval_generator - INFO - 第 1 批完成，生成了 3 个问答对
+2025-08-25 10:06:32 - deepeval_generator - INFO - 总进度: 3/3 (100.0%)
+2025-08-25 10:06:32 - task_manager - INFO - 更新任务状态: ID=32, status=running, completed=3
+2025-08-25 10:06:32 - datasets - INFO - 任务 32 进度: 3/3 (100.0%) - 第 1 批完成
+2025-08-25 10:06:32 - deepeval_generator - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 10:06:32 - task_manager - INFO - 更新任务状态: ID=32, status=running, completed=3
+2025-08-25 10:06:32 - datasets - INFO - 任务 32 进度: 3/3 (100.0%) - 生成完成
+2025-08-25 10:06:32 - datasets - INFO - DeepEval生成完成，总共生成了 3 个问答对
+2025-08-25 10:06:32 - task_manager - INFO - 更新任务状态: ID=32, status=completed, completed=3
+2025-08-25 10:06:32 - datasets - INFO - 任务 32 完成，生成了 3 个问答对，文件保存至: /tmp/context_qa_dataset_20250825_100632.csv
+2025-08-25 10:06:40 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:06:42 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:06:47 - user_manager - INFO - 创建用户示例: test_user
+2025-08-25 10:06:47 - user_manager - INFO - 获取用户示例: ID=1
+2025-08-25 10:06:47 - user_manager - INFO - 更新用户示例: ID=1, 更新字段: {'username': 'updated_user'}
+2025-08-25 10:06:47 - user_manager - INFO - 删除用户示例: ID=1
+2025-08-25 10:07:19 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:07:31 - test - INFO - 测试信息日志
+2025-08-25 10:07:31 - test - ERROR - 测试错误日志
+2025-08-25 10:07:42 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:07:49 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:07:49 - database - INFO - 数据库表创建成功
+2025-08-25 10:07:49 - main - INFO - 启动服务器: 0.0.0.0:8092
+2025-08-25 10:07:59 - datasets - INFO - 上下文生成请求: 上下文数量=1, 问题数量=2
+2025-08-25 10:08:00 - task_manager - INFO - 创建任务成功: generation_datasets_from_context_202508251007, ID: 33
+2025-08-25 10:08:00 - datasets - INFO - 上下文生成任务已创建: ID=33, 名称=generation_datasets_from_context_202508251007
+2025-08-25 10:08:00 - datasets - INFO - 开始处理上下文生成任务: ID=33
+2025-08-25 10:08:00 - task_manager - INFO - 更新任务状态: ID=33, status=running, completed=None
+2025-08-25 10:08:00 - datasets - INFO - 使用DeepEval生成数据集: 上下文数量=1, 问题数量=2
+2025-08-25 10:08:00 - deepeval_generator - INFO - 开始使用DeepEval生成数据集: 上下文数量=1, 问题数量=2
+2025-08-25 10:08:00 - deepeval_generator - INFO - 使用生成策略: single_batch, 批次大小: 2, 总批次数: 1
+2025-08-25 10:08:00 - deepeval_generator - INFO - 生成第 1/1 批，数量: 2
+2025-08-25 10:08:00 - task_manager - INFO - 更新任务状态: ID=33, status=running, completed=0
+2025-08-25 10:08:00 - datasets - INFO - 任务 33 进度: 0/2 (0.0%) - 正在生成第 1 批...
+2025-08-25 10:08:11 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:08:22 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:08:50 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:08:50 - database - INFO - 数据库表创建成功
+2025-08-25 10:08:50 - main - INFO - 启动服务器: 0.0.0.0:8092
+2025-08-25 10:08:51 - deepeval_generator - INFO - DeepEval数据集生成器初始化完成，使用模型: gpt-4-turbo
+2025-08-25 10:09:35 - datasets - INFO - 上下文生成请求: 上下文数量=4, 问题数量=11
+2025-08-25 10:09:35 - task_manager - INFO - 创建任务成功: generation_datasets_from_context_202508251009, ID: 34
+2025-08-25 10:09:35 - datasets - INFO - 上下文生成任务已创建: ID=34, 名称=generation_datasets_from_context_202508251009
+2025-08-25 10:09:35 - datasets - INFO - 开始处理上下文生成任务: ID=34
+2025-08-25 10:09:35 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=None
+2025-08-25 10:09:35 - datasets - INFO - 使用DeepEval生成数据集: 上下文数量=4, 问题数量=11
+2025-08-25 10:09:35 - deepeval_generator - INFO - 开始使用DeepEval生成数据集: 上下文数量=4, 问题数量=11
+2025-08-25 10:09:35 - deepeval_generator - INFO - 使用生成策略: multi_batch, 批次大小: 5, 总批次数: 3
+2025-08-25 10:09:35 - deepeval_generator - INFO - 生成第 1/3 批，数量: 5
+2025-08-25 10:09:35 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=0
+2025-08-25 10:09:35 - datasets - INFO - 任务 34 进度: 0/11 (0.0%) - 正在生成第 1 批...
+2025-08-25 10:09:40 - task_manager - INFO - 获取任务成功: ID=34
+2025-08-25 10:10:39 - task_manager - INFO - 获取任务成功: ID=34
+2025-08-25 10:10:40 - task_manager - INFO - 获取任务成功: ID=34
+2025-08-25 10:10:40 - task_manager - INFO - 获取任务成功: ID=34
+2025-08-25 10:11:26 - deepeval_generator - INFO - 第 1 批完成，生成了 5 个问答对
+2025-08-25 10:11:26 - deepeval_generator - INFO - 总进度: 5/11 (45.5%)
+2025-08-25 10:11:26 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=5
+2025-08-25 10:11:26 - datasets - INFO - 任务 34 进度: 5/11 (45.5%) - 第 1 批完成
+2025-08-25 10:11:26 - deepeval_generator - INFO - 生成第 2/3 批，数量: 5
+2025-08-25 10:11:26 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=5
+2025-08-25 10:11:26 - datasets - INFO - 任务 34 进度: 5/11 (45.5%) - 正在生成第 2 批...
+2025-08-25 10:11:55 - main - INFO - 健康检查接口被调用
+2025-08-25 10:13:09 - deepeval_generator - INFO - 第 2 批完成，生成了 5 个问答对
+2025-08-25 10:13:09 - deepeval_generator - INFO - 总进度: 10/11 (90.9%)
+2025-08-25 10:13:09 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=10
+2025-08-25 10:13:09 - datasets - INFO - 任务 34 进度: 10/11 (90.9%) - 第 2 批完成
+2025-08-25 10:13:09 - deepeval_generator - INFO - 生成第 3/3 批，数量: 1
+2025-08-25 10:13:09 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=10
+2025-08-25 10:13:09 - datasets - INFO - 任务 34 进度: 10/11 (90.9%) - 正在生成第 3 批...
+2025-08-25 10:13:44 - deepeval_generator - INFO - 第 3 批完成，生成了 1 个问答对
+2025-08-25 10:13:44 - deepeval_generator - INFO - 总进度: 11/11 (100.0%)
+2025-08-25 10:13:44 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=11
+2025-08-25 10:13:44 - datasets - INFO - 任务 34 进度: 11/11 (100.0%) - 第 3 批完成
+2025-08-25 10:13:44 - deepeval_generator - INFO - DeepEval生成完成，总共生成了 11 个问答对
+2025-08-25 10:13:45 - task_manager - INFO - 更新任务状态: ID=34, status=running, completed=11
+2025-08-25 10:13:45 - datasets - INFO - 任务 34 进度: 11/11 (100.0%) - 生成完成
+2025-08-25 10:13:45 - datasets - INFO - DeepEval生成完成，总共生成了 11 个问答对
+2025-08-25 10:13:45 - task_manager - INFO - 更新任务状态: ID=34, status=completed, completed=11
+2025-08-25 10:13:45 - datasets - INFO - 任务 34 完成，生成了 11 个问答对，文件保存至: /tmp/context_qa_dataset_20250825_101345.csv
