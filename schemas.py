@@ -16,6 +16,8 @@ class FromContextRequest(BaseModel):
 
 class FromTopicRequest(BaseModel):
     topic: str = Field(..., description="主题或场景，例如：技术运维/银行业务/客服服务等")
+    task_description: Optional[str] = Field(None, description="任务描述，用于限定问题生成的具体任务背景")
+    scene_description: Optional[str] = Field(None, description="场景描述，用于补充业务/情境信息")
     num_questions: int = Field(20, ge=1, le=200, description="期望生成的问题数量")
 
 
@@ -51,7 +53,7 @@ class TaskResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     error_message: Optional[str] = None
-    input_content: Optional[str] = None
+    preview: Optional[str] = None
     
     class Config:
         from_attributes = True 

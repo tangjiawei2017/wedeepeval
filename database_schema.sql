@@ -7,12 +7,12 @@ CREATE TABLE generation_tasks
     id               BIGINT PRIMARY KEY AUTO_INCREMENT,
     task_name        VARCHAR(100) NOT NULL COMMENT '任务名称',
     generation_type  ENUM('document', 'context', 'topic', 'augment') NOT NULL COMMENT '生成方式',
-    input_content    TEXT COMMENT '输入内容，可以是上下文信息或文件路径',
     status           ENUM('pending', 'running', 'completed', 'failed', 'cancelled') DEFAULT 'pending' COMMENT '任务状态',
     total_items      INT       DEFAULT 0 COMMENT '总生成数量',
     completed_items  INT       DEFAULT 0 COMMENT '已完成数量',
     -- 生成结果路径
     output_file_path VARCHAR(500) NULL COMMENT '输出文件路径',
+    preview          TEXT NULL COMMENT '结果预览（<=50字符，否则截断加...）',
     -- 时间戳
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

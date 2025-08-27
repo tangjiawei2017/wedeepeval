@@ -23,7 +23,7 @@ class TaskResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     error_message: Optional[str] = None
-    input_content: Optional[str] = None
+    preview: Optional[str] = None
     
     class Config:
         from_attributes = True

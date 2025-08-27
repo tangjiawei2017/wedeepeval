@@ -14,7 +14,7 @@ class GenerationTask(Base):
     total_items = Column(Integer, default=0, comment="总项目数")
     completed_items = Column(Integer, default=0, comment="已完成项目数")
     output_file_path = Column(String(500), nullable=True, comment="输出文件路径")
-    input_content = Column(Text, nullable=True, comment="输入内容")
+    preview = Column(Text, nullable=True, comment="结果预览（<=50字符，否则截断加...）")
     error_message = Column(Text, nullable=True, comment="错误信息")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -32,7 +32,7 @@ class GenerationTask(Base):
             'total_items': self.total_items,
             'completed_items': self.completed_items,
             'output_file_path': self.output_file_path,
-            'input_content': self.input_content,
+            'preview': self.preview,
             'error_message': self.error_message,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

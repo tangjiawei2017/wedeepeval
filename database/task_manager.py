@@ -11,7 +11,7 @@ logger = get_logger('task_manager')
 class TaskManager(DatabaseManager):
     """任务数据库管理器"""
     
-    def create_task(self, task_name: str, generation_type: str, total_items: int = 0, input_content: str = None) -> Optional[int]:
+    def create_task(self, task_name: str, generation_type: str, total_items: int = 0, preview: str = None) -> Optional[int]:
         """创建新任务"""
         try:
             # 验证 generation_type 是否为有效值
@@ -24,7 +24,7 @@ class TaskManager(DatabaseManager):
                 task_name=task_name,
                 generation_type=generation_type,
                 total_items=total_items,
-                input_content=input_content
+                preview=preview
             )
             
             self.db.add(task)
@@ -40,7 +40,7 @@ class TaskManager(DatabaseManager):
             return None
     
     def update_task_status(self, task_id: int, status: str, completed_items: int = None, 
-                          output_file_path: str = None, error_message: str = None):
+                          output_file_path: str = None, error_message: str = None, preview: str = None):
         """更新任务状态"""
         try:
             task = self.db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
@@ -57,6 +57,8 @@ class TaskManager(DatabaseManager):
                 task.output_file_path = output_file_path
             if error_message is not None:
                 task.error_message = error_message
+            if preview is not None:
+                task.preview = preview
             
             self.commit()
             

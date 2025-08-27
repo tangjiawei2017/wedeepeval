@@ -43,8 +43,8 @@ sleep 1
 if kill -0 $PID 2>/dev/null; then
     echo "✅ 服务已成功启动，进程ID: $PID"
     echo "📝 日志文件: logs/app.log"
-    echo "🌐 服务地址: http://localhost:8092"
-    echo "📚 API文档: http://localhost:8092/docs"
+    echo "🌐 服务地址: http://localhost:8093"
+    echo "📚 API文档: http://localhost:8093/docs"
     echo ""
     echo "💡 停止服务请运行: ./sh/stop.sh"
     echo "💡 查看日志请运行: tail -f logs/app.log"
