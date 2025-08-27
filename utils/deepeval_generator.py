@@ -319,7 +319,9 @@ class DeepEvalDatasetGenerator:
     async def generate_from_scratch(
         self, 
         num_questions: int,
-        scenario: str = "educational"
+        scenario: str = "educational",
+        topic: str = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None
     ) -> List[Dict]:
         """
         从零开始生成问答对
@@ -327,34 +329,139 @@ class DeepEvalDatasetGenerator:
         Args:
             num_questions: 需要生成的问题数量
             scenario: 生成场景
+            topic: 主题信息（可选）
+            progress_callback: 进度回调函数
             
         Returns:
             生成的问答对列表
         """
         try:
-            logger.info(f"开始使用DeepEval从零生成数据集: 问题数量={num_questions}")
+            logger.info(f"开始使用DeepEval从零生成数据集: 问题数量={num_questions}, 主题={topic}")
             
-            # 使用DeepEval生成数据集
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
-                num_goldens=num_questions
-            )
+            # 心跳日志（避免长时间无输出）
+            heartbeat_running = True
+            completed_so_far = 0
+
+            async def heartbeat() -> None:
+                while heartbeat_running:
+                    try:
+                        logger.info("from-scratch 正在处理中... (心跳)")
+                        if progress_callback:
+                            progress_callback(completed_so_far, num_questions, "正在生成中文问答...")
+                    except Exception as hb_err:
+                        logger.error(f"from-scratch 心跳上报失败: {hb_err}")
+                    await asyncio.sleep(2)
+
+            hb_task = asyncio.create_task(heartbeat())
+
+            try:
+                # 创建风格配置并设置到 synthesizer
+                styling_config = self._create_styling_config(scenario)
+                
+                # 如果有主题信息，修改任务描述
+                if topic:
+                    styling_config.task = f"基于主题'{topic}'生成中文问题和答案"
+                    styling_config.scenario = f"关于{topic}的教育问答"
+                
+                self.synthesizer.styling_config = styling_config
+                
+                # 使用DeepEval生成数据集
+                dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
+                    num_goldens=num_questions
+                )
+            finally:
+                heartbeat_running = False
+                try:
+                    hb_task.cancel()
+                except Exception:
+                    pass
             
             # 转换为我们的格式
             qa_items = []
             for golden in dataset:
+                # 处理 expected_output 为 None 的情况
+                expected_output = golden.expected_output if golden.expected_output is not None else "暂无标准答案"
+                
                 qa_item = {
                     'question': golden.input,
-                    'expected_output': golden.expected_output,
-                    'context': [],
-                    'context_length': 0
+                    'expected_output': expected_output,
+                    'context': [f"主题: {topic}"] if topic else [],
+                    'context_length': len(topic) if topic else 0
                 }
                 qa_items.append(qa_item)
             
-            logger.info(f"DeepEval从零生成完成，共生成 {len(qa_items)} 个问答对")
+            completed_so_far = len(qa_items)
+            logger.info(f"DeepEval从零生成完成，共生成 {len(qa_items)} 个中文问答对")
+            
+            # 最终进度更新
+            if progress_callback:
+                progress_callback(completed_so_far, num_questions, "生成完成")
+            
             return qa_items
             
         except Exception as e:
             logger.error(f"DeepEval从零生成失败: {str(e)}")
+            if progress_callback:
+                progress_callback(0, num_questions, f"生成失败: {str(e)}")
+            raise
+    
+    async def generate_from_goldens(
+        self, 
+        goldens: List, 
+        num_questions: int,
+        scenario: str = "educational"
+    ) -> List[Dict]:
+        """
+        从现有的Golden数据集生成新的问答对，用于数据集扩写
+        
+        Args:
+            goldens: 现有的Golden对象列表
+            num_questions: 需要生成的问题数量
+            scenario: 生成场景 (educational, conversational, technical)
+            
+        Returns:
+            List[Dict]: 生成的问答对列表
+        """
+        try:
+            logger.info(f"开始从Golden数据集生成扩写数据: 原始数据={len(goldens)}, 目标数量={num_questions}")
+            
+            # 计算分批策略
+            batch_strategy = self._calculate_batch_strategy(num_questions)
+            logger.info(f"使用分批策略: {batch_strategy}")
+            
+            # 创建风格配置
+            styling_config = self._create_styling_config(scenario)
+            self.synthesizer.styling_config = styling_config
+            
+            # 计算每个Golden生成多少个新Golden
+            max_goldens_per_golden = max(1, num_questions // len(goldens))
+            
+            # 使用DeepEval的generate_goldens_from_goldens方法
+            new_goldens = await self.synthesizer.a_generate_goldens_from_goldens(
+                goldens=goldens,
+                max_goldens_per_golden=max_goldens_per_golden,
+                include_expected_output=True
+            )
+            
+            # 转换为我们的格式
+            qa_items = []
+            for golden in new_goldens[:num_questions]:  # 限制数量
+                qa_item = {
+                    'question': golden.input,
+                    'expected_output': golden.expected_output if golden.expected_output else "暂无标准答案",
+                    'context': golden.context if golden.context else [],
+                    'context_length': len(str(golden.context)) if golden.context else 0
+                }
+                qa_items.append(qa_item)
+            
+            logger.info(f"DeepEval从Golden扩写完成，共生成 {len(qa_items)} 个问答对")
+            
+            return qa_items
+            
+        except Exception as e:
+            logger.error(f"DeepEval从Golden扩写失败: {str(e)}")
+            if progress_callback:
+                progress_callback(0, num_questions, f"扩写失败: {str(e)}")
             raise
     
     def save_dataset(self, qa_items: List[Dict], file_path: str, file_type: str = 'csv'):

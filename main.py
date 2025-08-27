@@ -6,6 +6,8 @@ from database import create_tables
 import uvicorn
 from config import SERVER_CONFIG, BASE_CONFIG
 from utils.logger import get_logger
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 # 获取日志记录器
 logger = get_logger('main')
@@ -23,6 +25,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 全局请求校验异常处理（避免对二进制请求体进行 UTF-8 解码）
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    logger.error(f"参数校验失败: {exc.errors()}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": exc.errors(),
+            "message": "参数校验失败，请检查表单字段与文件是否符合要求"
+        },
+    )
 
 app.include_router(datasets_router)
 app.include_router(tasks_router)

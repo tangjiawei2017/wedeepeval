@@ -302,7 +302,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
         )
 
 
-@router.post("/from-topic", summary="根据主题生成数据集（异步）")
+@router.post("/from-topic", summary="根据主题生成数据集（同步）")
 async def generate_from_topic(payload: FromTopicRequest):
     logger.info(f"主题生成请求: 主题={payload.topic}, 数量={payload.num_questions}")
 
@@ -310,64 +310,13 @@ async def generate_from_topic(payload: FromTopicRequest):
     if payload.num_questions < 1 or payload.num_questions > 200:
         raise HTTPException(status_code=400, detail="期望生成的问题数量需在 1~200 之间")
 
-    # 生成任务名称
-    task_name = generate_task_name("topic")
-
-    # 记录输入摘要
-    input_lines = [f"主题: {payload.topic}"]
-    if payload.task_description:
-        input_lines.append(f"任务: {payload.task_description}")
-    if payload.scene_description:
-        input_lines.append(f"场景: {payload.scene_description}")
-    input_content = "\n".join(input_lines)
-
-    # 创建任务
-    task_id = task_manager.create_task(
-        task_name=task_name,
-        generation_type="topic",
-        total_items=payload.num_questions,
-        preview=None
-    )
-    if not task_id:
-        raise HTTPException(status_code=500, detail="创建任务失败")
-
-    # 启动异步任务
-    asyncio.create_task(process_topic_generation(task_id, payload))
-
-    return {
-        "task_id": task_id,
-        "task_name": task_name,
-        "status": "pending",
-        "message": "任务已创建，正在异步处理"
-    }
-
-
-async def process_topic_generation(task_id: int, payload: FromTopicRequest):
-    logger.info(f"开始处理主题生成任务: ID={task_id}")
     try:
-        task_manager.update_task_status(task_id, "running")
-
-        # 将主题+描述组装为上下文
-        context_parts = [f"主题: {payload.topic}"]
-        if payload.task_description:
-            context_parts.append(f"任务描述: {payload.task_description}")
-        if payload.scene_description:
-            context_parts.append(f"场景描述: {payload.scene_description}")
-        combined_context = "\n".join(context_parts)
-
-        # 进度回调
-        def progress_callback(completed: int, total: int, status: str):
-            try:
-                task_manager.update_task_status(task_id, "running", completed_items=completed)
-            except Exception as e:
-                logger.error(f"主题任务进度更新失败: {str(e)}")
-
-        # 复用上下文生成逻辑，传入单条上下文
-        qa_items = await deepeval_generator.generate_from_contexts(
-            contexts=[combined_context],
+        # 直接调用生成方法，不使用异步任务
+        qa_items = await deepeval_generator.generate_from_scratch(
             num_questions=payload.num_questions,
             scenario="educational",
-            progress_callback=progress_callback
+            topic=payload.topic,  # 传递主题信息
+            progress_callback=None  # 不使用进度回调
         )
 
         if not qa_items:
@@ -379,8 +328,8 @@ async def process_topic_generation(task_id: int, payload: FromTopicRequest):
             final_items.append(QAItem(
                 question=item['question'],
                 expected_output=item['expected_output'],
-                context=[combined_context],
-                context_length=len(combined_context)
+                context=[f"主题: {payload.topic}"],  # 将主题作为上下文
+                context_length=len(payload.topic)
             ))
 
         # 保存CSV
@@ -392,18 +341,29 @@ async def process_topic_generation(task_id: int, payload: FromTopicRequest):
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(csv_content)
 
-        task_manager.update_task_status(
-            task_id,
-            "completed",
-            completed_items=len(final_items),
-            output_file_path=output_path,
-            preview=( (final_items and ((final_items[0].question + ' ' + final_items[0].expected_output)[:50] + ('' if len(final_items[0].question + ' ' + final_items[0].expected_output) <= 50 else '...'))) or '' )
-        )
-        logger.info(f"主题任务 {task_id} 完成，生成 {len(final_items)} 条，文件: {output_path}")
+        # 生成预览
+        preview_text = ""
+        if final_items:
+            first = final_items[0]
+            combined = f"{first.question} {first.expected_output}"
+            preview_text = (combined if len(combined) <= 50 else combined[:50] + "...")
+
+        logger.info(f"主题生成完成，生成了 {len(final_items)} 个问答对，文件保存至: {output_path}")
+
+        return {
+            "status": "success",
+            "message": f"成功生成 {len(final_items)} 个问答对",
+            "data": {
+                "total_items": len(final_items),
+                "output_file_path": output_path,
+                "preview": preview_text,
+                "qa_items": [item.dict() for item in final_items]
+            }
+        }
 
     except Exception as e:
-        logger.error(f"主题任务 {task_id} 失败: {str(e)}")
-        task_manager.update_task_status(task_id, "failed", error_message=str(e))
+        logger.error(f"主题生成失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
 
 
 @router.post("/augment", summary="根据数据集扩写数据集（异步）")
@@ -487,18 +447,20 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
     try:
         task_manager.update_task_status(task_id, "running")
 
-        def progress_callback(completed: int, total: int, status: str):
-            try:
-                task_manager.update_task_status(task_id, "running", completed_items=completed)
-            except Exception as e:
-                logger.error(f"扩写任务进度更新失败: {str(e)}")
-
-        # 用上下文驱动生成
-        qa_items = await deepeval_generator.generate_from_contexts(
-            contexts=contexts,
+        # 将上下文转换为Golden对象
+        from deepeval.test_case import Golden
+            
+        goldens = []
+        for context in contexts:
+            # 简单地将context作为input，创建一个基础的Golden
+            golden = Golden(input=context)
+            goldens.append(golden)
+        
+        # 使用DeepEval的generate_goldens_from_goldens方法进行数据集扩写
+        qa_items = await deepeval_generator.generate_from_goldens(
+            goldens=goldens,
             num_questions=target_num,
-            scenario="educational",
-            progress_callback=progress_callback
+            scenario="educational"
         )
         if not qa_items:
             raise Exception("未生成任何扩写数据")
