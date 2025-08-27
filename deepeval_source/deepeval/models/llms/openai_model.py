@@ -55,15 +55,7 @@ valid_gpt_models = [
     "o3-mini",
     "o3-mini-2025-01-31",
     "o4-mini",
-    "o4-mini-2025-04-16",
     "gpt-4.5-preview-2025-02-27",
-    "gpt-5",
-    "gpt-5-2025-08-07",
-    "gpt-5-mini",
-    "gpt-5-mini-2025-08-07",
-    "gpt-5-nano",
-    "gpt-5-nano-2025-08-07",
-    "gpt-5-chat-latest",
 ]
 
 unsupported_log_probs_gpt_models = [
@@ -76,13 +68,6 @@ unsupported_log_probs_gpt_models = [
     "o3-mini",
     "o3-mini-2025-01-31",
     "gpt-4.5-preview-2025-02-27",
-    "gpt-5",
-    "gpt-5-2025-08-07",
-    "gpt-5-mini",
-    "gpt-5-mini-2025-08-07",
-    "gpt-5-nano",
-    "gpt-5-nano-2025-08-07",
-    "gpt-5-chat-latest",
 ]
 
 structured_outputs_models = [
@@ -100,15 +85,7 @@ structured_outputs_models = [
     "o1-2024-12-17",
     "o3-mini",
     "o3-mini-2025-01-31",
-    "o4-mini",
-    "o4-mini-2025-04-16",
     "gpt-4.5-preview-2025-02-27",
-    "gpt-5",
-    "gpt-5-2025-08-07",
-    "gpt-5-mini",
-    "gpt-5-mini-2025-08-07",
-    "gpt-5-nano",
-    "gpt-5-nano-2025-08-07",
 ]
 
 json_mode_models = [
@@ -144,7 +121,6 @@ model_pricing = {
     "o3-mini": {"input": 1.10 / 1e6, "output": 4.40 / 1e6},
     "o3-mini-2025-01-31": {"input": 1.10 / 1e6, "output": 4.40 / 1e6},
     "o4-mini": {"input": 1.10 / 1e6, "output": 4.40 / 1e6},
-    "o4-mini-2025-04-16": {"input": 1.10 / 1e6, "output": 4.40 / 1e6},
     "gpt-4.1": {
         "input": 2.00 / 1e6,
         "output": 8.00 / 1e6,
@@ -161,56 +137,9 @@ model_pricing = {
         "input": 75.00 / 1e6,
         "output": 150.00 / 1e6,
     },
-    "gpt-5": {
-        "input": 1.25 / 1e6,
-        "output": 10.00 / 1e6,
-    },
-    "gpt-5-2025-08-07": {
-        "input": 1.25 / 1e6,
-        "output": 10.00 / 1e6,
-    },
-    "gpt-5-mini": {
-        "input": 0.25 / 1e6,
-        "output": 2.00 / 1e6,
-    },
-    "gpt-5-mini-2025-08-07": {
-        "input": 0.25 / 1e6,
-        "output": 2.00 / 1e6,
-    },
-    "gpt-5-nano": {
-        "input": 0.05 / 1e6,
-        "output": 0.40 / 1e6,
-    },
-    "gpt-5-nano-2025-08-07": {
-        "input": 0.05 / 1e6,
-        "output": 0.40 / 1e6,
-    },
-    "gpt-5-chat-latest": {
-        "input": 1.25 / 1e6,
-        "output": 10.00 / 1e6,
-    },
 }
 
 default_gpt_model = "gpt-4.1"
-
-# Thinking models that require temperature=1
-models_requiring_temperature_1 = [
-    "o1",
-    "o1-2024-12-17",
-    "o1-mini",
-    "o1-mini-2024-09-12",
-    "o3-mini",
-    "o3-mini-2025-01-31",
-    "o4-mini",
-    "o4-mini-2025-04-16",
-    "gpt-5",
-    "gpt-5-2025-08-07",
-    "gpt-5-mini",
-    "gpt-5-mini-2025-08-07",
-    "gpt-5-nano",
-    "gpt-5-nano-2025-08-07",
-    "gpt-5-chat-latest",
-]
 
 retryable_exceptions = (
     openai.RateLimitError,
@@ -279,11 +208,6 @@ class GPTModel(DeepEvalBaseLLM):
         self._openai_api_key = _openai_api_key
         self.base_url = base_url
         # args and kwargs will be passed to the underlying model, in load_model function
-
-        # Auto-adjust temperature for models that require it
-        if model_name in models_requiring_temperature_1:
-            temperature = 1
-
         if temperature < 0:
             raise ValueError("Temperature must be >= 0.")
         self.temperature = temperature

@@ -1,9 +1,10 @@
 import logging
-from typing import Optional, Any, Union, Tuple
+from typing import Optional
 import aiohttp
 import requests
 from enum import Enum
 import os
+
 from tenacity import (
     retry,
     wait_exponential_jitter,
@@ -11,9 +12,7 @@ from tenacity import (
     RetryCallState,
 )
 
-import deepeval
 from deepeval.key_handler import KEY_FILE_HANDLER, KeyValues
-from deepeval.confident.types import ApiResponse, ConfidentApiError
 
 CONFIDENT_API_KEY_ENV_VAR = "CONFIDENT_API_KEY"
 DEEPEVAL_BASE_URL = "https://deepeval.confident-ai.com"
@@ -31,20 +30,18 @@ def get_base_api_url():
         return API_BASE_URL
 
 
+def get_deepeval_base_url():
+    region = KEY_FILE_HANDLER.fetch_data(KeyValues.CONFIDENT_REGION)
+    if region == "EU":
+        return DEEPEVAL_BASE_URL_EU
+    else:
+        return DEEPEVAL_BASE_URL
+
+
 def get_confident_api_key():
-    return os.getenv(CONFIDENT_API_KEY_ENV_VAR) or KEY_FILE_HANDLER.fetch_data(
-        KeyValues.API_KEY
+    return KEY_FILE_HANDLER.fetch_data(KeyValues.API_KEY) or os.getenv(
+        CONFIDENT_API_KEY_ENV_VAR
     )
-
-
-def set_confident_api_key(api_key: Union[str, None]):
-    if api_key is None:
-        KEY_FILE_HANDLER.remove_key(KeyValues.API_KEY)
-        os.environ.pop(CONFIDENT_API_KEY_ENV_VAR, None)
-        return
-
-    KEY_FILE_HANDLER.write_key(KeyValues.API_KEY, api_key)
-    os.environ[CONFIDENT_API_KEY_ENV_VAR] = api_key
 
 
 def is_confident():
@@ -72,8 +69,10 @@ class Endpoints(Enum):
 
     TEST_RUN_ENDPOINT = "/v1/test-run"
     TRACES_ENDPOINT = "/v1/traces"
-    ANNOTATIONS_ENDPOINT = "/v1/annotations"
-    PROMPTS_ENDPOINT = "/v1/prompts"
+    FEEDBACK_ENDPOINT = "/v1/feedback"
+    PROMPT_ENDPOINT = "/v1/prompt"
+    RECOMMEND_ENDPOINT = "/v1/recommend-metrics"
+    EVALUATE_ENDPOINT = "/evaluate"
 
     EVALUATE_THREAD_ENDPOINT = "/v1/evaluate/threads/:threadId"
     EVALUATE_TRACE_ENDPOINT = "/v1/evaluate/traces/:traceUuid"
@@ -81,9 +80,12 @@ class Endpoints(Enum):
 
 
 class Api:
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, base_url=None):
         if api_key is None:
-            api_key = get_confident_api_key()
+            api_key = (
+                KEY_FILE_HANDLER.fetch_data(KeyValues.API_KEY)
+                or get_confident_api_key()
+            )
 
         if not api_key:
             raise ValueError(
@@ -94,9 +96,8 @@ class Api:
         self._headers = {
             "Content-Type": "application/json",
             "CONFIDENT_API_KEY": api_key,
-            "X-DeepEval-Version": deepeval.__version__,
         }
-        self.base_api_url = get_base_api_url()
+        self.base_api_url = base_url or get_base_api_url()
 
     @staticmethod
     @retry(
@@ -117,29 +118,6 @@ class Api:
             verify=True,  # SSL verification is always enabled
         )
 
-    def _handle_response(
-        self, response_data: Union[dict, Any]
-    ) -> Tuple[Any, Optional[str]]:
-        if not isinstance(response_data, dict):
-            return response_data, None
-
-        try:
-            api_response = ApiResponse(**response_data)
-        except Exception:
-            return response_data, None
-
-        if api_response.deprecated:
-            deprecation_msg = "You are using a deprecated API endpoint. Please update your deepeval version."
-            if api_response.link:
-                deprecation_msg += f" See: {api_response.link}"
-            logging.warning(deprecation_msg)
-
-        if not api_response.success:
-            error_message = api_response.error or "Request failed"
-            raise ConfidentApiError(error_message, api_response.link)
-
-        return api_response.data, api_response.link
-
     def send_request(
         self,
         method: HttpMethods,
@@ -147,7 +125,7 @@ class Api:
         body=None,
         params=None,
         url_params=None,
-    ) -> Tuple[Any, Optional[str]]:
+    ):
         url = f"{self.base_api_url}{endpoint.value}"
 
         # Replace URL parameters if provided
@@ -167,23 +145,33 @@ class Api:
 
         if res.status_code == 200:
             try:
-                response_data = res.json()
-                return self._handle_response(response_data)
+                return res.json()
             except ValueError:
-                return res.text, None
-        else:
-            try:
-                error_data = res.json()
-                return self._handle_response(error_data)
-            except (ValueError, ConfidentApiError) as e:
-                if isinstance(e, ConfidentApiError):
-                    raise e
-                error_message = (
-                    error_data.get("error", res.text)
-                    if "error_data" in locals()
-                    else res.text
+                return res.text
+        elif res.status_code == 409 and body:
+            message = res.json().get("message", "Conflict occurred.")
+
+            # Prompt the user for action
+            user_input = (
+                input(
+                    f"{message} Would you like to overwrite it? [y/N] or change the alias [c]: "
                 )
-                raise Exception(error_message)
+                .strip()
+                .lower()
+            )
+
+            if user_input == "y":
+                body["overwrite"] = True
+                return self.send_request(method, endpoint, body)
+            elif user_input == "c":
+                new_alias = input("Enter a new alias: ").strip()
+                body["alias"] = new_alias
+                return self.send_request(method, endpoint, body)
+            else:
+                print("Aborted.")
+                return None
+        else:
+            raise Exception(res.json().get("error", res.text))
 
     async def a_send_request(
         self,
@@ -192,9 +180,10 @@ class Api:
         body=None,
         params=None,
         url_params=None,
-    ) -> Tuple[Any, Optional[str]]:
+    ):
         url = f"{self.base_api_url}{endpoint.value}"
 
+        # Replace URL parameters if provided
         if url_params:
             for key, value in url_params.items():
                 placeholder = f":{key}"
@@ -212,20 +201,38 @@ class Api:
             ) as res:
                 if res.status == 200:
                     try:
-                        response_data = await res.json()
-                        return self._handle_response(response_data)
+                        return await res.json()
                     except aiohttp.ContentTypeError:
-                        return await res.text(), None
+                        return await res.text()
+                elif res.status == 409 and body:
+                    message = (await res.json()).get(
+                        "message", "Conflict occurred."
+                    )
+
+                    user_input = (
+                        input(
+                            f"{message} Would you like to overwrite it? [y/N] or change the alias [c]: "
+                        )
+                        .strip()
+                        .lower()
+                    )
+
+                    if user_input == "y":
+                        body["overwrite"] = True
+                        return await self.a_send_request(method, endpoint, body)
+                    elif user_input == "c":
+                        new_alias = input("Enter a new alias: ").strip()
+                        body["alias"] = new_alias
+                        return await self.a_send_request(method, endpoint, body)
+                    else:
+                        print("Aborted.")
+                        return None
                 else:
                     try:
                         error_data = await res.json()
-                        return self._handle_response(error_data)
-                    except (aiohttp.ContentTypeError, ConfidentApiError) as e:
-                        if isinstance(e, ConfidentApiError):
-                            raise e
-                        error_message = (
-                            error_data.get("error", await res.text())
-                            if "error_data" in locals()
-                            else await res.text()
+                        error_message = error_data.get(
+                            "error", await res.text()
                         )
-                        raise Exception(error_message)
+                    except aiohttp.ContentTypeError:
+                        error_message = await res.text()
+                    raise Exception(error_message)

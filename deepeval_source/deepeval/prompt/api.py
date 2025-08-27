@@ -22,24 +22,12 @@ class PromptType(Enum):
 
 class PromptHttpResponse(BaseModel):
     promptVersionId: str
-    text: Optional[str] = None
+    template: Optional[str] = None
     messages: Optional[List[PromptMessage]] = None
     interpolation_type: PromptInterpolationType = Field(
         serialization_alias="interpolationType"
     )
     type: PromptType
-
-
-class PromptPushRequest(BaseModel):
-    alias: str
-    text: Optional[str] = None
-    messages: Optional[List[PromptMessage]] = None
-    interpolation_type: PromptInterpolationType = Field(
-        serialization_alias="interpolationType"
-    )
-
-    class Config:
-        use_enum_values = True
 
 
 class PromptApi(BaseModel):

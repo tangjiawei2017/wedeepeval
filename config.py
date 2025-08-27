@@ -34,6 +34,13 @@ API_CONFIG = {
     'openai_model': os.getenv('OPENAI_MODEL', 'gpt-4-turbo')
 }
 
+# Embedding模型配置
+EMBEDDING_CONFIG = {
+    'embedding_api_key': os.getenv('EMBEDDING_API_KEY', ''),
+    'embedding_base_url': os.getenv('EMBEDDING_BASE_URL', 'https://api.gpt.ge/v1/'),
+    'embedding_model_name': os.getenv('EMBEDDING_MODEL_NAME', 'text-embedding-3-large')
+}
+
 # 服务器配置
 SERVER_CONFIG = {
     'host': os.getenv('SERVER_HOST', '0.0.0.0'),

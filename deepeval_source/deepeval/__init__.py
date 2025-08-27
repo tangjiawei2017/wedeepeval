@@ -5,11 +5,14 @@ import re
 # Optionally add telemetry
 from ._version import __version__
 
+from deepeval.feedback import collect_feedback, a_collect_feedback
 from deepeval.evaluate import evaluate, assert_test
 from deepeval.evaluate.compare import compare
 from deepeval.test_run import on_test_run_end, log_hyperparameters
 from deepeval.utils import login
 from deepeval.telemetry import *
+from deepeval.confident import confident_evaluate
+
 
 if os.getenv("DEEPEVAL_GRPC_LOGGING") != "YES":
     os.environ["GRPC_VERBOSITY"] = "ERROR"
@@ -18,9 +21,13 @@ if os.getenv("DEEPEVAL_GRPC_LOGGING") != "YES":
 __all__ = [
     "login",
     "log_hyperparameters",
+    "track",
+    "a_collect_feedback",
+    "collect_feedback",
     "evaluate",
     "assert_test",
     "on_test_run_end",
+    "confident_evaluate",
     "compare",
 ]
 

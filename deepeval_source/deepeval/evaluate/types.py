@@ -1,6 +1,7 @@
-from typing import Optional, List, Union, Dict
 from dataclasses import dataclass
+from typing import Optional, List, Union, Dict
 from pydantic import BaseModel
+
 from deepeval.test_run import MetricData
 from deepeval.test_case import MLLMImage
 

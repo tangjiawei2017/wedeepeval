@@ -768,14 +768,21 @@ class ContextGenerator:
                 ) / 4
             except TypeError:
                 res = self.model.generate(prompt)
-                data = trimAndLoadJson(res, self)
-                score = (
-                    data["clarity"]
-                    + data["depth"]
-                    + data["structure"]
-                    + data["relevance"]
-                ) / 4
-                return score
+                try:
+                    data = trimAndLoadJson(res, self)
+                    score = (
+                        data["clarity"]
+                        + data["depth"]
+                        + data["structure"]
+                        + data["relevance"]
+                    ) / 4
+                    return score
+                except Exception as e:
+                    print(f"[ERROR] prompt生成的结果非json,prompt:{prompt},res:{res}")
+                    sys.exit(0)
+            except Exception as e:
+                print("evaluate chunk fail, res:{}", res)
+                return 0
 
     async def a_evaluate_chunk(self, chunk) -> float:
         prompt = FilterTemplate.evaluate_context(chunk)

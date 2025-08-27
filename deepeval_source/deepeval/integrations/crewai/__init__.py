@@ -1,4 +1,2 @@
-from .handler import instrument_crewai
+from .handler import instrumentator
 from .agent import Agent
-
-__all__ = ["instrument_crewai", "Agent"]

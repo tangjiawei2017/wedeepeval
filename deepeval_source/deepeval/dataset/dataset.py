@@ -20,6 +20,7 @@ from deepeval.dataset.utils import (
 )
 from deepeval.dataset.api import (
     APIDataset,
+    CreateDatasetHttpResponse,
     DatasetHttpResponse,
     APIQueueDataset,
 )
@@ -32,11 +33,7 @@ from deepeval.test_case import (
 )
 from deepeval.test_run.hyperparameters import process_hyperparameters
 from deepeval.test_run.test_run import TEMP_FILE_PATH
-from deepeval.utils import (
-    convert_keys_to_snake_case,
-    get_or_create_event_loop,
-    open_browser,
-)
+from deepeval.utils import convert_keys_to_snake_case, get_or_create_event_loop
 from deepeval.test_run import (
     global_test_run_manager,
 )
@@ -620,18 +617,22 @@ class EvaluationDataset:
             # Pydantic version below 2.0
             body = api_dataset.dict(by_alias=True, exclude_none=True)
 
-        _, link = api.send_request(
+        result = api.send_request(
             method=HttpMethods.POST,
             endpoint=Endpoints.DATASET_ENDPOINT,
             body=body,
         )
-        if link:
+        if result:
+            response = CreateDatasetHttpResponse(
+                link=result["link"],
+            )
+            link = response.link
             console = Console()
             console.print(
                 "✅ Dataset successfully pushed to Confident AI! View at "
                 f"[link={link}]{link}[/link]"
             )
-            open_browser(link)
+            webbrowser.open(link)
 
     def pull(
         self,
@@ -652,7 +653,7 @@ class EvaluationDataset:
                     total=100,
                 )
                 start_time = time.perf_counter()
-                data, _ = api.send_request(
+                result = api.send_request(
                     method=HttpMethods.GET,
                     endpoint=Endpoints.DATASET_ENDPOINT,
                     params={
@@ -662,17 +663,17 @@ class EvaluationDataset:
                 )
 
                 response = DatasetHttpResponse(
-                    id=data["id"],
                     goldens=convert_keys_to_snake_case(
-                        data.get("goldens", None)
+                        result.get("goldens", None)
                     ),
                     conversationalGoldens=convert_keys_to_snake_case(
-                        data.get("conversationalGoldens", None)
+                        result.get("conversationalGoldens", None)
                     ),
+                    datasetId=result["datasetId"],
                 )
 
                 self._alias = alias
-                self._id = response.id
+                self._id = response.datasetId
                 self._multi_turn = response.goldens is None
                 self.goldens = []
                 self.test_cases = []
@@ -680,7 +681,7 @@ class EvaluationDataset:
                 if auto_convert_goldens_to_test_cases:
                     if not self._multi_turn:
                         llm_test_cases = convert_goldens_to_test_cases(
-                            response.goldens, alias, response.id
+                            response.goldens, alias, response.datasetId
                         )
                         self._llm_test_cases.extend(llm_test_cases)
                     else:
@@ -688,7 +689,7 @@ class EvaluationDataset:
                             convert_convo_goldens_to_convo_test_cases(
                                 response.conversational_goldens,
                                 alias,
-                                response.id,
+                                response.datasetId,
                             )
                         )
                         self._conversational_test_cases.extend(
@@ -702,7 +703,7 @@ class EvaluationDataset:
 
                     for golden in self.goldens:
                         golden._dataset_alias = alias
-                        golden._dataset_id = response.id
+                        golden._dataset_id = response.datasetId
 
                 end_time = time.perf_counter()
                 time_taken = format(end_time - start_time, ".2f")
@@ -737,13 +738,17 @@ class EvaluationDataset:
             # Pydantic version below 2.0
             body = api_dataset.dict(by_alias=True, exclude_none=True)
 
-        _, link = api.send_request(
+        result = api.send_request(
             method=HttpMethods.POST,
             endpoint=Endpoints.DATASET_QUEUE_ENDPOINT,
             body=body,
             url_params={"alias": alias},
         )
-        if link and print_response:
+        if result and print_response:
+            response = CreateDatasetHttpResponse(
+                link=result["link"],
+            )
+            link = response.link
             console = Console()
             console.print(
                 "✅ Goldens successfully queued to Confident AI! Annotate & finalized them at "

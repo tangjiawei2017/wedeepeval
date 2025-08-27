@@ -3,6 +3,3 @@ from .synthesizer import (
     Evolution,
     PromptEvolution,
 )
-
-
-__all__ = ["Synthesizer", "Evolution", "PromptEvolution"]

@@ -147,4 +147,6 @@ class ConversationalApiTestCase(BaseModel):
 
 
 class TestRunHttpResponse(BaseModel):
-    id: str
+    testRunId: str
+    projectId: str
+    link: str

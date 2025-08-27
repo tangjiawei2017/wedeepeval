@@ -24,6 +24,7 @@ from deepeval.metrics.argument_correctness.schema import *
 class ArgumentCorrectnessMetric(BaseMetric):
     _required_params: List[LLMTestCaseParams] = [
         LLMTestCaseParams.INPUT,
+        LLMTestCaseParams.ACTUAL_OUTPUT,
         LLMTestCaseParams.TOOLS_CALLED,
     ]
 
