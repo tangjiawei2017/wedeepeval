@@ -31,7 +31,7 @@ echo "✅ 使用配置文件: env.$ENV"
 mkdir -p logs
 
 # 启动应用（后台运行）
-nohup /data/deepeval/deepeval-main/deepeval/bin/python main.py > logs/app.log 2>&1 &
+nohup python3 main.py > logs/app.log 2>&1 &
 
 # 获取后台进程ID
 PID=$!
