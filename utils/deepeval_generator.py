@@ -31,7 +31,7 @@ from utils.logger import get_logger
 from config import API_CONFIG
 
 # 获取日志记录器
-logger = get_logger('deepeval_generator', 'app')
+logger = get_logger('deepeval_generator', 'business')
 
 class DeepEvalDatasetGenerator:
     """使用DeepEval生成数据集的工具类"""
@@ -53,7 +53,7 @@ class DeepEvalDatasetGenerator:
     
     def _prepare_contexts_with_instruction(self, contexts: List[str]) -> List[List[str]]:
         """为上下文添加推理指示"""
-        instruction = "请基于以下信息进行推理，生成中文问题和答案："
+        instruction = "请基于以下信息进行推理，生成中文问题和答案。要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容。"
         contexts_with_instruction = [instruction] + contexts
         return [contexts_with_instruction]
     
@@ -61,9 +61,9 @@ class DeepEvalDatasetGenerator:
         """创建生成风格配置"""
         return StylingConfig(
             scenario=scenario,  # 教育场景
-            task="question_generation",  # 问题生成任务
-            input_format="Chinese",  # 输入格式为中文
-            expected_output_format="Chinese"  # 期望输出格式为中文
+            task="生成中文问答对。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文。",  # 问题生成任务
+            input_format="中文问题，必须以中文开头，不能包含英文",  # 输入格式为中文
+            expected_output_format="中文答案，必须用中文回答，不能包含英文"  # 期望输出格式为中文
         )
     
 
@@ -93,11 +93,16 @@ class DeepEvalDatasetGenerator:
             
             # 创建风格配置
             styling_config = self._create_styling_config(scenario)
+            # 进一步强化中文生成要求
+            styling_config.task = "基于上下文内容生成中文问答对。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语。"
             
             # 计算每个上下文生成的问题数量
             max_goldens_per_context = max(1, num_questions // len(contexts_with_instruction))
             
             logger.info(f"一次性生成 {num_questions} 个问答对，每个上下文生成 {max_goldens_per_context} 个")
+            
+            # 设置风格配置
+            self.synthesizer.styling_config = styling_config
             
             # 使用DeepEval一次性生成所有问答对
             dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
@@ -162,6 +167,12 @@ class DeepEvalDatasetGenerator:
             # 计算每个文档生成的问题数量
             max_goldens_per_context = max(1, num_questions // len(document_paths))
             
+            # 创建风格配置并设置到 synthesizer
+            styling_config = self._create_styling_config(scenario)
+            # 进一步强化中文生成要求
+            styling_config.task = "基于文档内容生成中文问答对。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语。"
+            self.synthesizer.styling_config = styling_config
+            
             # 使用DeepEval生成数据集
             dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_docs(
                 document_paths=document_paths,
@@ -172,11 +183,23 @@ class DeepEvalDatasetGenerator:
             # 转换为我们的格式
             qa_items = []
             for golden in dataset:
+                # 获取真实的文档片段内容
+                context_content = []
+                if hasattr(golden, 'context') and golden.context:
+                    # 如果 Golden 对象有 context 属性，直接使用
+                    if isinstance(golden.context, list):
+                        context_content = golden.context
+                    else:
+                        context_content = [str(golden.context)]
+                elif hasattr(golden, 'source_file'):
+                    # 如果没有 context，至少记录来源文件
+                    context_content = [f"文档: {golden.source_file}"]
+                
                 qa_item = {
                     'question': golden.input,
                     'expected_output': golden.expected_output,
-                    'context': [f"文档: {golden.source_file}"] if hasattr(golden, 'source_file') else [],
-                    'context_length': len(golden.input)
+                    'context': context_content,
+                    'context_length': sum(len(str(x)) for x in context_content)
                 }
                 qa_items.append(qa_item)
             
@@ -212,8 +235,10 @@ class DeepEvalDatasetGenerator:
             
             # 如果有主题信息，修改任务描述
             if topic:
-                styling_config.task = f"基于主题'{topic}'生成中文问题和答案"
-                styling_config.scenario = f"关于{topic}的教育问答"
+                styling_config.task = f"基于主题'{topic}'生成中文问题和答案。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语；7. 问题必须以中文开头，不能以英文开头；8. 绝对不允许生成英文问题；9. 问题必须以'什么是'、'如何'、'为什么'、'请解释'等中文词汇开头；10. 禁止使用任何英文单词，包括技术术语也要用中文表达。"
+                styling_config.scenario = f"关于{topic}的中文教育问答"
+                styling_config.input_format = "中文问题，必须以中文开头，不能包含英文"
+                styling_config.expected_output_format = "中文答案，必须用中文回答，不能包含英文"
             
             self.synthesizer.styling_config = styling_config
             
@@ -270,6 +295,7 @@ class DeepEvalDatasetGenerator:
             
             # 创建风格配置
             styling_config = self._create_styling_config(scenario)
+            styling_config.task = "基于现有数据生成中文问答对。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语。"
             self.synthesizer.styling_config = styling_config
             
             # 计算每个Golden生成多少个新Golden

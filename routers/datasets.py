@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import sys
+import json
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, FileResponse
@@ -11,7 +12,7 @@ from utils.response import success, error
 from fastapi import HTTPException
 from database import TaskManager
 from datetime import datetime
-from config import FILE_CONFIG
+from config import FILE_CONFIG, PREVIEW_CONFIG
 
 # 确保使用源码路径导入 DeepEval
 DEEPEVAL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deepeval_source')
@@ -113,6 +114,7 @@ async def generate_from_document(
 
 async def process_document_generation(task_id: int, filename: str, content_bytes: bytes, suffix: str, num_questions: int):
     logger.info(f"开始处理文档生成任务: ID={task_id}, 文件={filename}")
+    logger.info("=== 使用新的 JSON preview 生成逻辑 ===")
     try:
         task_manager.update_task_status(task_id, "running")
 
@@ -150,12 +152,35 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(csv_content)
 
+        # 生成 preview JSON 数据，取前几条数据
+        logger.info(f"开始生成 preview，final_items 数量: {len(final_items)}")
+        preview_data = []
+        # 防止要取的数量大于实际生成的数量
+        max_items = min(PREVIEW_CONFIG['document_items'], len(final_items))
+        for item in final_items[:max_items]:
+            # 处理 expected_output，如果长度大于配置限制则截取并补齐...
+            expected_output = item.expected_output
+            if len(expected_output) > PREVIEW_CONFIG['max_length']:
+                expected_output = expected_output[:PREVIEW_CONFIG['max_length']] + "..."
+            
+            preview_data.append({
+                "question": item.question,
+                "expected_output": expected_output,
+                "context_length": item.context_length
+            })
+        logger.info(f"preview_data 生成完成，数量: {len(preview_data)}")
+        
+        preview_json = json.dumps(preview_data, ensure_ascii=False)
+        
+        # 添加调试日志
+        logger.info(f"生成的 preview JSON: {preview_json}")
+        
         task_manager.update_task_status(
             task_id,
             "completed",
             completed_items=len(final_items),
             output_file_path=output_path,
-            preview=( (final_items and ((final_items[0].question + ' ' + final_items[0].expected_output)[:50] + ('' if len(final_items[0].question + ' ' + final_items[0].expected_output) <= 50 else '...'))) or '' )
+            preview=preview_json
         )
         logger.info(f"文档任务 {task_id} 完成，生成 {len(final_items)} 条，文件: {output_path}")
     except Exception as e:
@@ -360,19 +385,24 @@ async def process_topic_generation(task_id: int, topic: str, num_questions: int)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(csv_content)
 
-        # 生成预览
-        preview_text = ""
-        if final_items:
-            first = final_items[0]
-            combined = f"{first.question} {first.expected_output}"
-            preview_text = (combined if len(combined) <= 50 else combined[:50] + "...")
+        # 生成 preview JSON 数组，取前几条数据的问题
+        preview_data = []
+        # 防止要取的数量大于实际生成的数量
+        max_items = min(PREVIEW_CONFIG['topic_items'], len(final_items))
+        for item in final_items[:max_items]:
+            question = item.question
+            if len(question) > PREVIEW_CONFIG['max_length']:
+                question = question[:PREVIEW_CONFIG['max_length']] + "..."
+            preview_data.append(question)
+        
+        preview_json = json.dumps(preview_data, ensure_ascii=False)
 
         task_manager.update_task_status(
             task_id,
             "completed",
             completed_items=len(final_items),
             output_file_path=output_path,
-            preview=preview_text
+            preview=preview_json
         )
         logger.info(f"主题任务 {task_id} 完成，生成 {len(final_items)} 条，文件: {output_path}")
     except Exception as e:
@@ -501,12 +531,28 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
             for it in augment_items:
                 writer.writerow([it.input, it.expected_output or ''])
 
+        # 生成 preview JSON 对象，取前几条数据
+        preview_data = []
+        # 防止要取的数量大于实际生成的数量
+        max_items = min(PREVIEW_CONFIG['augment_items'], len(augment_items))
+        for item in augment_items[:max_items]:
+            expected_output = item.expected_output or ""
+            if len(expected_output) > PREVIEW_CONFIG['max_length']:
+                expected_output = expected_output[:PREVIEW_CONFIG['max_length']] + "..."
+            
+            preview_data.append({
+                "input": item.input,
+                "expected_output": expected_output
+            })
+        
+        preview_json = json.dumps(preview_data, ensure_ascii=False)
+        
         task_manager.update_task_status(
             task_id,
             "completed",
             completed_items=len(augment_items),
             output_file_path=output_path,
-            preview=(augment_items and ( (augment_items[0].input + ' ' + (augment_items[0].expected_output or ''))[:50] + ('' if len(augment_items[0].input + ' ' + (augment_items[0].expected_output or '')) <= 50 else '...') ) or '')
+            preview=preview_json
         )
         logger.info(f"扩写任务 {task_id} 完成，生成 {len(augment_items)} 条，文件: {output_path}")
     except Exception as e:

@@ -42,6 +42,9 @@ def setup_logger(name: str = 'wedeepeval', log_type: str = 'app') -> logging.Log
     if log_type == 'app':
         # app.log 用于系统启动、错误等日志
         log_file = os.path.join(log_dir, 'app.log')
+    elif log_type == 'access':
+        # access.log 用于访问日志
+        log_file = os.path.join(log_dir, 'access.log')
     else:
         # wedeepeval_*.log 用于业务请求日志
         today = datetime.now().strftime('%Y-%m-%d')

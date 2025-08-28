@@ -69,6 +69,14 @@ LOG_CONFIG = {
     'encoding': 'utf-8'
 }
 
+# Preview配置
+PREVIEW_CONFIG = {
+    'max_length': int(os.getenv('PREVIEW_MAX_LENGTH', 60)),  # preview字段最大长度限制
+    'document_items': int(os.getenv('PREVIEW_DOCUMENT_ITEMS', 5)),  # 文档生成preview取前几条
+    'topic_items': int(os.getenv('PREVIEW_TOPIC_ITEMS', 10)),  # 主题生成preview取前几条
+    'augment_items': int(os.getenv('PREVIEW_AUGMENT_ITEMS', 5))  # 扩写生成preview取前几条
+}
+
 
 
 # 打印当前环境信息

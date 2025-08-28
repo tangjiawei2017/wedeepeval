@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeDeepEval APIs（离线版）</title>
+  <style>
+    :root{ --primary:#0B5FFF; --bg:#f5f7fb; --card:#ffffff; --border:#e6eaf2; --muted:#6b7280; --text:#1f2937; }
+    *{ box-sizing:border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body{ background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+    header { padding: 18px 20px; background: linear-gradient(135deg, #0b5fff 0%, #4c8dff 100%); color: #fff; position: sticky; top:0; z-index:10; box-shadow: 0 2px 12px rgba(11,95,255,.2); }
+    .container { max-width: 1120px; margin: 0 auto; }
+    .title { font-size:20px; font-weight:800; letter-spacing:.3px; }
+    .subtitle { margin-top:4px; color: #e6eeff; font-size:13px; }
+    main { padding: 20px; }
+    #meta > div { margin: 12px 0 18px; }
+    .tag { display: inline-block; background: #eef3ff; color: var(--primary); border: 1px solid #d9e4ff; border-radius: 999px; padding: 4px 10px; margin: 6px 8px 0 0; font-size: 12px; font-weight: 600; }
+
+    .path { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin: 14px 0; overflow: hidden; box-shadow: 0 6px 18px rgba(17,24,39,.04); }
+    .path-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fbfcff; border-bottom: 1px solid var(--border); }
+    .method { font-weight: 700; font-size: 12px; color: #fff; border-radius: 6px; padding: 4px 8px; text-transform: uppercase; letter-spacing:.4px; }
+    .method.get { background: #2f855a; }
+    .method.post { background: #b7791f; }
+    .method.put { background: #3182ce; }
+    .method.delete { background: #e53e3e; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#f1f5f9; padding:3px 8px; border-radius:6px; font-size:12px; }
+    .opid { color: var(--muted); font-size: 12px; }
+    .summary { font-weight: 700; }
+    .section { padding: 12px 16px 16px; }
+    .desc { color: #374151; line-height: 1.6; }
+
+    h4 { margin: 14px 0 8px; font-size: 14px; color:#0f172a; }
+    table { border-collapse: collapse; width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow:hidden; }
+    th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 10px 12px; font-size: 13px; vertical-align: top; }
+    th { background: #f7f9ff; color:#0f172a; }
+    tr:last-child td { border-bottom: none; }
+
+    details { margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; background:#fcfdff; overflow: hidden; }
+    details > summary { cursor: pointer; padding: 10px 12px; list-style: none; font-weight:600; background:#f7f9ff; border-bottom:1px solid var(--border); }
+    details[open] > summary { background:#eef3ff; }
+    details > pre { margin: 0; padding: 12px 14px; background: #0a0f1a; color: #e5e7eb; overflow-x: auto; font-size:12px; }
+
+    .muted { color: var(--muted); font-size: 12px; }
+    .meta-line { display:flex; align-items:center; gap:10px; color:#475569; font-size:13px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="title" id="title">WeDeepEval APIs</div>
+      <div class="subtitle" id="desc"></div>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <div id="meta"></div>
+      <div id="paths"></div>
+    </div>
+  </main>
+
+  <script>
+    let __spec = null;
+
+    function el(tag, attrs = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'class') node.className = v; else if (k === 'html') node.innerHTML = v; else node.setAttribute(k, v);
+      });
+      (Array.isArray(children) ? children : [children]).filter(Boolean).forEach(c => node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+      return node;
+    }
+
+    function byRef(ref){
+      if (!__spec || !ref || !ref.startsWith('#/')) return null;
+      const parts = ref.replace(/^#\//,'').split('/');
+      let cur = __spec;
+      for (const p of parts){ cur = cur?.[p]; if(!cur) return null; }
+      return cur;
+    }
+
+    function mergeObjects(base, extra){
+      const out = { ...base };
+      Object.keys(extra || {}).forEach(k => {
+        if (k === 'properties'){
+          out.properties = { ...(out.properties||{}), ...(extra.properties||{}) };
+        } else if (k === 'required'){
+          out.required = Array.from(new Set([...(out.required||[]), ...(extra.required||[])]));
+        } else if (k === 'allOf' || k === '$ref'){
+        } else {
+          out[k] = extra[k];
+        }
+      });
+      return out;
+    }
+
+    function resolveSchema(schema, seen = new Set()){
+      if (!schema) return schema;
+      if (schema.$ref){
+        if (seen.has(schema.$ref)) return { description: '…' };
+        seen.add(schema.$ref);
+        const target = byRef(schema.$ref);
+        return resolveSchema(target || schema, seen);
+      }
+      if (schema.allOf && Array.isArray(schema.allOf)){
+        let merged = {};
+        for (const sub of schema.allOf){
+          merged = mergeObjects(merged, resolveSchema(sub, seen));
+        }
+        merged = mergeObjects(merged, { ...schema, allOf: undefined });
+        return merged;
+      }
+      const out = { ...schema };
+      if (out.items) out.items = resolveSchema(out.items, seen);
+      if (out.properties){
+        const props = {};
+        for (const k of Object.keys(out.properties)) props[k] = resolveSchema(out.properties[k], seen);
+        out.properties = props;
+      }
+      return out;
+    }
+
+    function anyOfType(prop){
+      const parts = (prop.anyOf || []).map(x => resolveSchema(x) || x).map(x => {
+        if (x?.format === 'binary' && (x?.type === 'string' || !x?.type)) return 'file';
+        return x?.type || 'object';
+      });
+      const unique = Array.from(new Set(parts));
+      if (unique.length === 2 && unique.includes('string') && unique.includes('null')) return 'string | null';
+      return unique.join(' | ');
+    }
+
+    function prettyType(prop){
+      if (!prop) return '';
+      if (prop.anyOf) return anyOfType(prop);
+      if (prop.nullable) return `${prop.type || 'object'} | null`;
+      if (prop.format === 'binary' && (prop.type === 'string' || !prop.type)) return 'file';
+      if (prop.items) return `array<${prettyType(prop.items) || prop.items?.type || 'object'}>`;
+      return prop.type || 'object';
+    }
+
+    function renderObjectTable(schemaObj){
+      const table = el('table');
+      table.appendChild(el('thead', {}, el('tr', {}, [
+        el('th', { html: '字段名' }),
+        el('th', { html: '类型' }),
+        el('th', { html: '说明' })
+      ])));
+      const tbody = el('tbody');
+      Object.entries(schemaObj.properties || {}).forEach(([name, prop]) => {
+        const row = el('tr');
+        row.appendChild(el('td', { html: `<span class="mono">${name}</span>` }));
+        row.appendChild(el('td', { html: prettyType(prop) }));
+        row.appendChild(el('td', { html: prop?.description || '' }));
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function renderSchemaPretty(schema){
+      let s = resolveSchema(schema);
+      if ((!s || (Object.keys(s).length === 0 && !s.properties)) && schema?.$ref){
+        const fallback = byRef(schema.$ref);
+        if (fallback) s = resolveSchema(fallback);
+      }
+      if (s && (s.type === 'object' || s.properties)){
+        const box = el('div');
+        if (s.description) box.appendChild(el('div', { class:'muted', html: s.description }));
+        box.appendChild(renderObjectTable(s));
+        return box;
+      }
+      return el('pre', {}, JSON.stringify(s || {}, null, 2));
+    }
+
+    function renderApiResponse(schema){
+      // 强力兜底：识别 $ref 指向 ApiResponse*
+      const ref = schema?.$ref || '';
+      if (!ref.includes('ApiResponse')) return null;
+      const def = byRef(ref);
+      const api = byRef('#/components/schemas/ApiResponse');
+      // data schema
+      let dataSchema = def?.properties?.data || api?.properties?.data;
+      if (dataSchema?.$ref) dataSchema = byRef(dataSchema.$ref);
+      const composed = {
+        type: 'object',
+        properties: {
+          code: { type: 'integer', description: '业务状态码，0 表示成功' },
+          message: { type: 'string', description: '提示信息' },
+          data: dataSchema || { description: '业务数据' }
+        }
+      };
+      const box = el('div');
+      box.appendChild(renderObjectTable(composed));
+      // 展开 data 详情
+      if (dataSchema && (dataSchema.type === 'object' || dataSchema.properties)){
+        const details = el('details');
+        details.appendChild(el('summary', { html: '<span class="mono">data</span> 详细结构' }));
+        details.appendChild(renderSchemaPretty({ $ref: def?.properties?.data?.$ref }));
+        box.appendChild(details);
+      }
+      return box;
+    }
+
+    function renderParams(params = []) {
+      if (!params.length) return el('div', { class: 'muted' }, '无');
+      const table = el('table');
+      const thead = el('thead');
+      thead.appendChild(el('tr', {}, [
+        el('th', { html: '名称' }),
+        el('th', { html: '位置' }),
+        el('th', { html: '必填' }),
+        el('th', { html: '类型' }),
+        el('th', { html: '说明' })
+      ]));
+      table.appendChild(thead);
+      const tbody = el('tbody');
+      params.forEach(p => {
+        const schema = p.schema || {};
+        const resolved = resolveSchema(schema);
+        tbody.appendChild(el('tr', {}, [
+          el('td', { html: `<span class=\"mono\">${p.name || ''}</span>` }),
+          el('td', { html: p.in || '' }),
+          el('td', { html: p.required ? '是' : '否' }),
+          el('td', { html: prettyType(resolved) }),
+          el('td', { html: p.description || '' })
+        ]));
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function renderRequestBody(rb) {
+      if (!rb) return el('div', { class: 'muted' }, '无');
+      const box = el('div');
+      if (rb.description) box.appendChild(el('div', { class: 'muted', html: rb.description }));
+      const content = rb.content || {};
+      Object.keys(content).forEach(ct => {
+        const schema = content[ct].schema || {};
+        const details = el('details');
+        details.appendChild(el('summary', { html: `<span class="mono">${ct}</span> Schema` }));
+        details.appendChild(renderSchemaPretty(schema));
+        box.appendChild(details);
+      });
+      return box;
+    }
+
+    function renderResponses(responses = {}) {
+      const keys = Object.keys(responses).filter(k => k === '200' || k === '201');
+      if (!keys.length) return el('div', { class: 'muted' }, '无');
+      const box = el('div');
+      keys.forEach(code => {
+        const r = responses[code] || {};
+        const details = el('details');
+        details.appendChild(el('summary', { html: `<span class="badge">${code}</span> ${r.description || ''}` }));
+        const content = r.content || {};
+        Object.keys(content).forEach(ct => {
+          const schema = content[ct].schema || {};
+          details.appendChild(el('div', { class: 'muted', html: `<span class="mono">${ct}</span>` }));
+          const forced = renderApiResponse(schema);
+          if (forced) { details.appendChild(forced); }
+          else { details.appendChild(renderSchemaPretty(schema)); }
+        });
+        box.appendChild(details);
+      });
+      return box;
+    }
+
+    function methodClass(m){ return `method ${m.toLowerCase()}`; }
+
+    function render(spec) {
+      __spec = spec;
+      document.getElementById('title').textContent = (spec.info && spec.info.title) || 'OpenAPI';
+      document.getElementById('desc').textContent = (spec.info && spec.info.description) || '';
+
+      const meta = el('div');
+      meta.appendChild(el('div', { class: 'meta-line' }, [
+        el('span', { class:'muted', html: `OpenAPI: ${spec.openapi || ''}` }),
+        el('span', { class:'muted', html: `版本: ${(spec.info && spec.info.version) || ''}` })
+      ]));
+      if (spec.tags) {
+        const tagsRow = el('div');
+        (spec.tags || []).forEach(t => tagsRow.appendChild(el('span', { class: 'tag' }, t.name)));
+        meta.appendChild(tagsRow);
+      }
+      document.getElementById('meta').appendChild(meta);
+
+      const pathsBox = document.getElementById('paths');
+      const paths = spec.paths || {};
+      Object.keys(paths).forEach(path => {
+        const ops = paths[path];
+        Object.keys(ops).forEach(m => {
+          const op = ops[m];
+          const card = el('div', { class: 'path' });
+          const head = el('div', { class: 'path-head' });
+          head.appendChild(el('span', { class: methodClass(m), html: m }));
+          head.appendChild(el('span', { class: 'mono' }, path));
+          head.appendChild(el('span', { class: 'summary' }, ` ${op.summary || ''}`));
+          if (op.operationId) head.appendChild(el('span', { class: 'opid' }, ` (${op.operationId})`));
+          card.appendChild(head);
+
+          const sec = el('div', { class: 'section' });
+          if (op.description) sec.appendChild(el('div', { class: 'desc' }, op.description));
+
+          sec.appendChild(el('h4', { html: '请求参数' }));
+          sec.appendChild(renderParams(op.parameters));
+
+          sec.appendChild(el('h4', { html: '请求体' }));
+          sec.appendChild(renderRequestBody(op.requestBody));
+
+          sec.appendChild(el('h4', { html: '响应' }));
+          sec.appendChild(renderResponses(op.responses));
+
+          card.appendChild(sec);
+          pathsBox.appendChild(card);
+        });
+      });
+    }
+
+    async function load() {
+      try {
+        const resp = await fetch('./openapi.json', { cache: 'no-cache' });
+        if (!resp.ok) throw new Error('failed');
+        const spec = await resp.json();
+        render(spec);
+      } catch (e) {
+        document.getElementById('paths').appendChild(el('div', { class: 'desc' }, '未能加载 openapi.json，请确保通过服务访问 /docs，或将 openapi.json 放到同目录。'));
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
+

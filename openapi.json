@@ -1,0 +1,591 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WeDeepEval Dataset APIs",
+    "description": "根据文档/上下文/主题/扩写生成数据集的接口集合",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/datasets/from-document": {
+      "post": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "根据文档生成数据集（异步）",
+        "operationId": "generate_from_document_datasets_from_document_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_generate_from_document_datasets_from_document_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_TaskBrief" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/from-context": {
+      "post": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "根据上下文生成数据集（使用DeepEval）",
+        "description": "使用DeepEval基于提供的上下文信息生成问答对，创建异步任务",
+        "operationId": "generate_from_context_datasets_from_context_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FromContextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_TaskBrief" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/from-topic": {
+      "post": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "根据主题生成数据集（异步）",
+        "operationId": "generate_from_topic_datasets_from_topic_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FromTopicRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_TaskBrief" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/augment": {
+      "post": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "根据数据集扩写数据集（异步）",
+        "operationId": "augment_dataset_datasets_augment_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_augment_dataset_datasets_augment_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_TaskBrief" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/template": {
+      "get": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "下载扩写模板CSV",
+        "operationId": "download_template_datasets_template_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": { "schema": { "type": "string", "format": "binary" } }
+            }
+          }
+        }
+      }
+    },
+    "/task/list": {
+      "get": {
+        "tags": [
+          "Task"
+        ],
+        "summary": "获取所有任务",
+        "description": "获取所有任务列表",
+        "operationId": "get_all_tasks_task_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_TaskList" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task/{task_id}": {
+      "get": {
+        "tags": [
+          "Task"
+        ],
+        "summary": "获取指定任务",
+        "description": "根据任务ID获取任务详情",
+        "operationId": "get_task_task__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse_Task" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task/download/{task_id}": {
+      "get": {
+        "tags": [
+          "Task"
+        ],
+        "summary": "下载任务生成的文件",
+        "description": "根据任务ID下载生成的文件\n\nArgs:\n    task_id: 任务ID\n    \nReturns:\n    文件下载响应",
+        "operationId": "download_task_file_task_download__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+  },
+  "components": {
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "example": 0 },
+          "message": { "type": "string", "example": "ok" },
+          "data": {}
+        },
+        "required": ["code", "message", "data"],
+        "title": "ApiResponse"
+      },
+      "TaskBrief": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "task_name": { "type": "string" },
+          "status": { "type": "string", "example": "pending" },
+          "message": { "type": "string" },
+          "total_items": { "type": "integer" }
+        },
+        "required": ["task_id", "task_name"],
+        "title": "TaskBrief"
+      },
+      "ApiResponse_TaskBrief": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "example": 0 },
+          "message": { "type": "string", "example": "ok" },
+          "data": { "$ref": "#/components/schemas/TaskBrief" }
+        },
+        "required": ["code", "message", "data"],
+        "title": "ApiResponse_TaskBrief"
+      },
+      "TaskListData": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskResponse" } },
+          "pagination": { "nullable": true }
+        },
+        "required": ["items"],
+        "title": "TaskListData"
+      },
+      "ApiResponse_TaskList": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "example": 0 },
+          "message": { "type": "string", "example": "ok" },
+          "data": { "$ref": "#/components/schemas/TaskListData" }
+        },
+        "required": ["code", "message", "data"],
+        "title": "ApiResponse_TaskList"
+      },
+      "ApiResponse_Task": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "example": 0 },
+          "message": { "type": "string", "example": "ok" },
+          "data": { "$ref": "#/components/schemas/TaskResponse" }
+        },
+        "required": ["code", "message", "data"],
+        "title": "ApiResponse_Task"
+      },
+
+      "Body_augment_dataset_datasets_augment_post": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "format": "binary",
+            "title": "Dataset",
+            "description": "上传已有数据集CSV，包含 input,expected_output 列"
+          },
+          "ratio": {
+            "type": "number",
+            "title": "Ratio",
+            "description": "生成比例，默认1.0",
+            "default": 1.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset"
+        ],
+        "title": "Body_augment_dataset_datasets_augment_post"
+      },
+      "Body_generate_from_document_datasets_from_document_post": {
+        "properties": {
+          "document": {
+            "type": "string",
+            "format": "binary",
+            "title": "Document",
+            "description": "上传文档，支持 .txt/.docx/.pdf"
+          },
+          "num_questions": {
+            "type": "integer",
+            "title": "Num Questions",
+            "description": "生成的问题数量，默认10",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "title": "Body_generate_from_document_datasets_from_document_post"
+      },
+      "FromContextRequest": {
+        "properties": {
+          "contexts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Contexts",
+            "description": "每条上下文信息一行，建议每组2-5条相关信息"
+          },
+          "num_questions": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Num Questions",
+            "description": "期望生成的问答对数量",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "contexts"
+        ],
+        "title": "FromContextRequest"
+      },
+      "FromTopicRequest": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "description": "主题或场景，例如：技术运维/银行业务/客服服务等"
+          },
+          "task_description": {
+            "type": "string",
+            "nullable": true,
+            "title": "Task Description",
+            "description": "任务描述，用于限定问题生成的具体任务背景"
+          },
+          "scene_description": {
+            "type": "string",
+            "nullable": true,
+            "title": "Scene Description",
+            "description": "场景描述，用于补充业务/情境信息"
+          },
+          "num_questions": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Num Questions",
+            "description": "期望生成的问题数量",
+            "default": 20
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic"
+        ],
+        "title": "FromTopicRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "TaskResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "generation_type": {
+            "type": "string",
+            "title": "Generation Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "completed_items": {
+            "type": "integer",
+            "title": "Completed Items"
+          },
+          "output_file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output File Path"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_name",
+          "generation_type",
+          "status",
+          "total_items",
+          "completed_items"
+        ],
+        "title": "TaskResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

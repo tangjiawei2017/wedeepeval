@@ -27,10 +27,16 @@ fi
 
 echo "✅ 使用配置文件: env.$ENV"
 
+# 先停止现有服务
+echo "🛑 停止现有服务..."
+# 使用唯一的进程标识符停止服务
+pkill -f "main.py" 2>/dev/null || true
+sleep 2
+
 # 确保日志目录存在
 mkdir -p logs
 
-# 启动应用（后台运行）
+# 启动应用（后台运行，使用唯一标识符）
 nohup python3 main.py > logs/app.log 2>&1 &
 
 # 获取后台进程ID

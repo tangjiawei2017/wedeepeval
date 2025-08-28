@@ -7,11 +7,19 @@ echo "🛑 正在停止数据集生成平台..."
 # 查找并停止所有相关进程
 echo "🔍 查找相关进程..."
 
-# 查找Python主进程（支持多种Python命令）
-PYTHON_PIDS=$(ps aux | grep -E "(Python3 main.py|Python main.py)" | grep -v grep | awk '{print $2}')
+# 查找WeDeepEval主进程（使用唯一标识符）
+PYTHON_PIDS=$(pgrep -f "main.py")
 
 # 查找Uvicorn进程
-UVICORN_PIDS=$(ps aux | grep "uvicorn" | grep -v grep | awk '{print $2}')
+UVICORN_PIDS=$(pgrep -f "uvicorn")
+
+# 显示找到的进程信息（调试用）
+if [ ! -z "$PYTHON_PIDS" ]; then
+    echo "🔍 找到WeDeepEval进程: $PYTHON_PIDS"
+    for pid in $PYTHON_PIDS; do
+        ps -p $pid -o pid,ppid,command --no-headers 2>/dev/null || true
+    done
+fi
 
 # 合并所有进程ID
 ALL_PIDS=""

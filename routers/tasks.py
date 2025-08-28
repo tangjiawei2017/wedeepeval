@@ -9,8 +9,7 @@ from utils.response import success, error
 
 router = APIRouter(prefix="/task", tags=["Task"])
 
-# 创建任务管理器实例
-task_manager = TaskManager()
+# 每次查询时创建新的任务管理器实例，确保读取最新数据
 
 class TaskResponse(BaseModel):
     id: int
@@ -55,6 +54,7 @@ async def get_all_tasks():
     获取所有任务列表
     """
     try:
+        task_manager = TaskManager()
         tasks = task_manager.get_all_tasks()
         
         # 处理每个任务的时间格式
@@ -75,6 +75,7 @@ async def get_task(task_id: int):
     根据任务ID获取任务详情
     """
     try:
+        task_manager = TaskManager()
         task = task_manager.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
@@ -105,6 +106,7 @@ async def download_task_file(task_id: int):
     """
     try:
         # 获取任务信息
+        task_manager = TaskManager()
         task = task_manager.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
