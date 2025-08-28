@@ -187,6 +187,10 @@ class CustomOpenAI(DeepEvalBaseLLM):
     
     def get_cost_summary(self) -> Dict[str, Any]:
         """Get detailed cost and timing summary"""
+        # Calculate throughput and latency metrics
+        throughput_items_per_sec = self.call_count / self.total_time if self.total_time > 0 else 0
+        average_latency_ms_per_item = (self.total_time * 1000) / self.call_count if self.call_count > 0 else 0
+        
         return {
             "model_name": self.model_name,
             "total_calls": self.call_count,
@@ -197,6 +201,8 @@ class CustomOpenAI(DeepEvalBaseLLM):
             "total_time": self.total_time,
             "average_cost_per_call": self.total_cost / self.call_count if self.call_count > 0 else 0,
             "average_time_per_call": self.total_time / self.call_count if self.call_count > 0 else 0,
+            "throughput_items_per_sec": throughput_items_per_sec,
+            "average_latency_ms_per_item": average_latency_ms_per_item,
             "cost_history": self.cost_history
         }
     
@@ -219,6 +225,9 @@ class CustomOpenAI(DeepEvalBaseLLM):
             if summary['total_time'] > 0:
                 tokens_per_second = summary['total_tokens'] / summary['total_time']
                 print(f"🚀 Tokens per Second: {tokens_per_second:.1f}")
+            # Display throughput and latency metrics
+            print(f"📊 Throughput: {summary['throughput_items_per_sec']:.3f} items/s")
+            print(f"⏱️  Average Latency: {summary['average_latency_ms_per_item']:.1f} ms/item")
         print(f"{'='*70}")
         
         if len(self.cost_history) > 0:
