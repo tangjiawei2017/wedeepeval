@@ -8,7 +8,7 @@ echo "🛑 正在停止数据集生成平台..."
 echo "🔍 查找相关进程..."
 
 # 查找Python主进程（支持多种Python命令）
-PYTHON_PIDS=$(ps aux | grep -E "(python3 main.py|Python main.py)" | grep -v grep | awk '{print $2}')
+PYTHON_PIDS=$(ps aux | grep -E "(/data/deepeval/deepeval-main/deepeval/bin/python main.py|Python main.py)" | grep -v grep | awk '{print $2}')
 
 # 查找Uvicorn进程
 UVICORN_PIDS=$(ps aux | grep "uvicorn" | grep -v grep | awk '{print $2}')

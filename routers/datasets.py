@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, FileResponse
+from utils.response import success, error
 from fastapi import HTTPException
 from database import TaskManager
 from datetime import datetime
@@ -102,12 +103,12 @@ async def generate_from_document(
     # 将文件内容与后续参数交给异步 worker
     asyncio.create_task(process_document_generation(task_id, document.filename, content_bytes, suffix, num_questions))
 
-    return {
+    return success({
         "task_id": task_id,
         "task_name": task_name,
         "status": "pending",
         "message": "任务已创建，正在异步处理"
-    }
+    })
 
 
 async def process_document_generation(task_id: int, filename: str, content_bytes: bytes, suffix: str, num_questions: int):
@@ -318,15 +319,11 @@ async def generate_from_topic(payload: FromTopicRequest):
         num_questions=payload.num_questions
     ))
 
-    return {
-        "status": "success",
-        "message": "主题生成任务已启动",
-        "data": {
-            "task_id": task_id,
-            "task_name": task_name,
-            "total_items": payload.num_questions
-        }
-    }
+    return success({
+        "task_id": task_id,
+        "task_name": task_name,
+        "total_items": payload.num_questions
+    }, message="主题生成任务已启动")
 
 
 async def process_topic_generation(task_id: int, topic: str, num_questions: int):
@@ -453,12 +450,12 @@ async def augment_dataset(
     # 启动异步处理
     asyncio.create_task(process_augment_generation(task_id, contexts, target_num))
 
-    return {
+    return success({
         "task_id": task_id,
         "task_name": task_name,
         "status": "pending",
         "message": "任务已创建，正在异步处理"
-    }
+    })
 
 
 async def process_augment_generation(task_id: int, contexts: List[str], target_num: int):

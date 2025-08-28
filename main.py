@@ -8,6 +8,7 @@ from config import SERVER_CONFIG, BASE_CONFIG
 from utils.logger import get_logger
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from utils.response import success, error
 
 # 获取日志记录器 - 使用系统日志类型
 logger = get_logger('main', 'app')
@@ -30,13 +31,11 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
     logger.error(f"参数校验失败: {exc.errors()}")
-    return JSONResponse(
-        status_code=400,
-        content={
-            "detail": exc.errors(),
-            "message": "参数校验失败，请检查表单字段与文件是否符合要求"
-        },
-    )
+    return JSONResponse(status_code=400, content=error(
+        message="参数校验失败，请检查表单字段与文件是否符合要求",
+        code=400,
+        data={"detail": exc.errors()}
+    ))
 
 app.include_router(datasets_router)
 app.include_router(tasks_router)
@@ -48,7 +47,7 @@ async def root():
     from utils.logger import get_logger
     business_logger = get_logger('main', 'business')
     business_logger.info("健康检查接口被调用")
-    return {"message": "WeDeepEval dataset service is running", "docs": "/docs"}
+    return success({"message": "WeDeepEval dataset service is running", "docs": "/docs"})
 
 
 if __name__ == "__main__":

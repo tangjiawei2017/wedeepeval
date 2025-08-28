@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from database import TaskManager
 from datetime import datetime
 import os
+from utils.response import success, error
 
 router = APIRouter(prefix="/task", tags=["Task"])
 
@@ -48,7 +49,7 @@ class TaskResponse(BaseModel):
             result['updated_at'] = result['updated_at'].replace('T', ' ')
         return result
 
-@router.get("/list", response_model=List[TaskResponse], summary="获取所有任务")
+@router.get("/list", summary="获取所有任务")
 async def get_all_tasks():
     """
     获取所有任务列表
@@ -63,12 +64,12 @@ async def get_all_tasks():
             if task.get('updated_at') and isinstance(task['updated_at'], str) and 'T' in task['updated_at']:
                 task['updated_at'] = task['updated_at'].replace('T', ' ')
         
-        # 直接使用 TaskResponse 模型
-        return [TaskResponse(**task) for task in tasks]
+        items = [TaskResponse(**task).dict() for task in tasks]
+        return success({"items": items, "pagination": None})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
+        return error(message=f"获取任务列表失败: {str(e)}", code=500)
 
-@router.get("/{task_id}", response_model=TaskResponse, summary="获取指定任务")
+@router.get("/{task_id}", summary="获取指定任务")
 async def get_task(task_id: int):
     """
     根据任务ID获取任务详情
@@ -84,12 +85,12 @@ async def get_task(task_id: int):
         if task.get('updated_at') and isinstance(task['updated_at'], str) and 'T' in task['updated_at']:
             task['updated_at'] = task['updated_at'].replace('T', ' ')
         
-        # 直接使用 TaskResponse 模型
-        return TaskResponse(**task)
-    except HTTPException:
-        raise
+        return success(TaskResponse(**task).dict())
+    except HTTPException as e:
+        # FastAPI 会用全局异常处理；此处保持原样抛出
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取任务失败: {str(e)}")
+        return error(message=f"获取任务失败: {str(e)}", code=500)
 
 @router.get("/download/{task_id}", summary="下载任务生成的文件")
 async def download_task_file(task_id: int):
