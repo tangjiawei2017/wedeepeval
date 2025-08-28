@@ -116,7 +116,7 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
     logger.info(f"开始处理文档生成任务: ID={task_id}, 文件={filename}")
     logger.info("=== 使用新的 JSON preview 生成逻辑 ===")
     try:
-        task_manager.update_task_status(task_id, "running")
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "running")
 
         # 保存到临时目录
         temp_dir = os.path.join(FILE_CONFIG['output_dir'], 'tmp_docs')
@@ -126,10 +126,29 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         with open(temp_path, 'wb') as f:
             f.write(content_bytes)
 
+        # 定义进度回调函数
+        def progress_callback(completed: int, total: int, status: str):
+            try:
+                # 计算进度百分比
+                progress_percent = int((completed / total) * 100) if total > 0 else 0
+                logger.info(f"文档任务 {task_id} 进度: {completed}/{total} ({progress_percent}%) - {status}")
+                
+                # 异步更新任务状态，避免阻塞主任务
+                asyncio.create_task(asyncio.to_thread(
+                    task_manager.update_task_status,
+                    task_id, 
+                    "running", 
+                    completed_items=completed,
+                    total_items=total
+                ))
+            except Exception as e:
+                logger.error(f"更新任务进度失败: {str(e)}")
+
         qa_items = await deepeval_generator.generate_from_documents(
             document_paths=[temp_path],
             num_questions=num_questions,
-            scenario="educational"
+            scenario="educational",
+            progress_callback=progress_callback
         )
         if not qa_items:
             raise Exception("未生成任何问答对")
@@ -175,7 +194,9 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         # 添加调试日志
         logger.info(f"生成的 preview JSON: {preview_json}")
         
-        task_manager.update_task_status(
+        # 异步更新任务完成状态
+        await asyncio.to_thread(
+            task_manager.update_task_status,
             task_id,
             "completed",
             completed_items=len(final_items),
@@ -187,7 +208,7 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         import traceback
         error_details = traceback.format_exc()
         logger.error(f"文档任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
-        task_manager.update_task_status(task_id, "failed", error_message=str(e))
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "failed", error_message=str(e))
 
 
 @router.post("/from-context", summary="根据上下文生成数据集（使用DeepEval）")
@@ -248,15 +269,34 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
 
     try:
         # 更新任务状态为运行中
-        task_manager.update_task_status(task_id, "running")
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "running")
 
         logger.info(f"使用DeepEval生成数据集: 上下文数量={len(payload.contexts)}, 问题数量={payload.num_questions}")
+
+        # 定义进度回调函数
+        def progress_callback(completed: int, total: int, status: str):
+            try:
+                # 计算进度百分比
+                progress_percent = int((completed / total) * 100) if total > 0 else 0
+                logger.info(f"上下文任务 {task_id} 进度: {completed}/{total} ({progress_percent}%) - {status}")
+                
+                # 异步更新任务状态，避免阻塞主任务
+                asyncio.create_task(asyncio.to_thread(
+                    task_manager.update_task_status,
+                    task_id, 
+                    "running", 
+                    completed_items=completed,
+                    total_items=total
+                ))
+            except Exception as e:
+                logger.error(f"更新任务进度失败: {str(e)}")
 
         # 使用DeepEval生成数据集
         qa_items = await deepeval_generator.generate_from_contexts(
             contexts=payload.contexts,
             num_questions=payload.num_questions,
-            scenario="educational"
+            scenario="educational",
+            progress_callback=progress_callback
         )
 
         # 检查DeepEval生成结果
@@ -295,7 +335,8 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
             first = final_items[0]
             combined = f"{first.question} {first.expected_output}"
             preview_text = (combined if len(combined) <= 50 else combined[:50] + "...")
-        task_manager.update_task_status(
+        await asyncio.to_thread(
+            task_manager.update_task_status,
             task_id, 
             "completed", 
             completed_items=len(final_items),
@@ -310,7 +351,8 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
         import traceback
         error_details = traceback.format_exc()
         logger.error(f"任务 {task_id} 处理失败: {str(e)}\n错误详情: {error_details}")
-        task_manager.update_task_status(
+        await asyncio.to_thread(
+            task_manager.update_task_status,
             task_id,
             "failed",
             error_message=f"任务处理失败: {str(e)}"
@@ -341,6 +383,8 @@ async def generate_from_topic(payload: FromTopicRequest):
     asyncio.create_task(process_topic_generation(
         task_id=task_id,
         topic=payload.topic,
+        task_description=payload.task_description,
+        scene_description=payload.scene_description,
         num_questions=payload.num_questions
     ))
 
@@ -351,16 +395,37 @@ async def generate_from_topic(payload: FromTopicRequest):
     }, message="主题生成任务已启动")
 
 
-async def process_topic_generation(task_id: int, topic: str, num_questions: int):
-    logger.info(f"开始处理主题生成任务: ID={task_id}, 主题={topic}, 数量={num_questions}")
+async def process_topic_generation(task_id: int, topic: str, task_description: str = None, scene_description: str = None, num_questions: int = 20):
+    logger.info(f"开始处理主题生成任务: ID={task_id}, 主题={topic}, 任务描述={task_description}, 场景描述={scene_description}, 数量={num_questions}")
     try:
-        task_manager.update_task_status(task_id, "running")
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "running")
 
-        # 调用生成方法
+        # 定义进度回调函数
+        def progress_callback(completed: int, total: int, status: str):
+            try:
+                # 计算进度百分比
+                progress_percent = int((completed / total) * 100) if total > 0 else 0
+                logger.info(f"主题任务 {task_id} 进度: {completed}/{total} ({progress_percent}%) - {status}")
+                
+                # 异步更新任务状态，避免阻塞主任务
+                asyncio.create_task(asyncio.to_thread(
+                    task_manager.update_task_status,
+                    task_id, 
+                    "running", 
+                    completed_items=completed,
+                    total_items=total
+                ))
+            except Exception as e:
+                logger.error(f"更新任务进度失败: {str(e)}")
+
+        # 调用生成方法，传入进度回调
         qa_items = await deepeval_generator.generate_from_scratch(
             num_questions=num_questions,
             scenario="educational",
-            topic=topic
+            topic=topic,
+            task_description=task_description,
+            scene_description=scene_description,
+            progress_callback=progress_callback
         )
 
         if not qa_items:
@@ -372,8 +437,8 @@ async def process_topic_generation(task_id: int, topic: str, num_questions: int)
             final_items.append(QAItem(
                 question=item['question'],
                 expected_output=item['expected_output'],
-                context=[f"主题: {topic}"],  # 将主题作为上下文
-                context_length=len(topic)
+                context=item['context'],  # 使用生成器返回的完整上下文
+                context_length=item['context_length']
             ))
 
         # 保存CSV
@@ -397,7 +462,9 @@ async def process_topic_generation(task_id: int, topic: str, num_questions: int)
         
         preview_json = json.dumps(preview_data, ensure_ascii=False)
 
-        task_manager.update_task_status(
+        # 异步更新任务完成状态
+        await asyncio.to_thread(
+            task_manager.update_task_status,
             task_id,
             "completed",
             completed_items=len(final_items),
@@ -409,7 +476,7 @@ async def process_topic_generation(task_id: int, topic: str, num_questions: int)
         import traceback
         error_details = traceback.format_exc()
         logger.error(f"主题任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
-        task_manager.update_task_status(task_id, "failed", error_message=str(e))
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "failed", error_message=str(e))
 
 
 @router.post("/augment", summary="根据数据集扩写数据集（异步）")
@@ -491,7 +558,7 @@ async def augment_dataset(
 async def process_augment_generation(task_id: int, contexts: List[str], target_num: int):
     logger.info(f"开始处理扩写任务: ID={task_id}, 上下文数={len(contexts)}, 目标数量={target_num}")
     try:
-        task_manager.update_task_status(task_id, "running")
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "running")
 
         # 将上下文转换为Golden对象
         # 确保使用源码路径导入
@@ -503,11 +570,30 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
             golden = Golden(input=context)
             goldens.append(golden)
         
+        # 定义进度回调函数
+        def progress_callback(completed: int, total: int, status: str):
+            try:
+                # 计算进度百分比
+                progress_percent = int((completed / total) * 100) if total > 0 else 0
+                logger.info(f"扩写任务 {task_id} 进度: {completed}/{total} ({progress_percent}%) - {status}")
+                
+                # 异步更新任务状态，避免阻塞主任务
+                asyncio.create_task(asyncio.to_thread(
+                    task_manager.update_task_status,
+                    task_id, 
+                    "running", 
+                    completed_items=completed,
+                    total_items=total
+                ))
+            except Exception as e:
+                logger.error(f"更新任务进度失败: {str(e)}")
+
         # 使用DeepEval的generate_goldens_from_goldens方法进行数据集扩写
         qa_items = await deepeval_generator.generate_from_goldens(
             goldens=goldens,
             num_questions=target_num,
-            scenario="educational"
+            scenario="educational",
+            progress_callback=progress_callback
         )
         if not qa_items:
             raise Exception("未生成任何扩写数据")
@@ -547,7 +633,8 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
         
         preview_json = json.dumps(preview_data, ensure_ascii=False)
         
-        task_manager.update_task_status(
+        await asyncio.to_thread(
+            task_manager.update_task_status,
             task_id,
             "completed",
             completed_items=len(augment_items),
@@ -559,7 +646,7 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
         import traceback
         error_details = traceback.format_exc()
         logger.error(f"扩写任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
-        task_manager.update_task_status(task_id, "failed", error_message=str(e))
+        await asyncio.to_thread(task_manager.update_task_status, task_id, "failed", error_message=str(e))
 
 
 @router.get("/template", summary="下载扩写模板CSV")

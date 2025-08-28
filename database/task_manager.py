@@ -40,6 +40,7 @@ class TaskManager(DatabaseManager):
             return None
     
     def update_task_status(self, task_id: int, status: str, completed_items: int = None, 
+                          total_items: int = None,
                           output_file_path: str = None, error_message: str = None, preview: str = None):
         """更新任务状态"""
         try:
@@ -53,6 +54,8 @@ class TaskManager(DatabaseManager):
             
             if completed_items is not None:
                 task.completed_items = completed_items
+            if total_items is not None:
+                task.total_items = total_items
             if output_file_path is not None:
                 task.output_file_path = output_file_path
             if error_message is not None:
@@ -62,7 +65,7 @@ class TaskManager(DatabaseManager):
             
             self.commit()
             
-            logger.info(f"更新任务状态: ID={task_id}, status={status}, completed={completed_items}")
+            logger.info(f"更新任务状态: ID={task_id}, status={status}, completed={completed_items}/{total_items}")
             
         except Exception as e:
             self.rollback()
