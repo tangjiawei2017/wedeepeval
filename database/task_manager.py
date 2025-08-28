@@ -6,7 +6,7 @@ from database.base import DatabaseManager
 from database.models import GenerationTask
 from utils.logger import get_logger
 
-logger = get_logger('task_manager')
+logger = get_logger('task_manager', 'business')
 
 class TaskManager(DatabaseManager):
     """任务数据库管理器"""

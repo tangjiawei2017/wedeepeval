@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from config import DATABASE_CONFIG
 from utils.logger import get_logger
 
-logger = get_logger('database')
+logger = get_logger('database', 'app')
 
 # 创建数据库引擎
 DATABASE_URL = f"mysql+mysqlconnector://{DATABASE_CONFIG['user']}:{DATABASE_CONFIG['password']}@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"

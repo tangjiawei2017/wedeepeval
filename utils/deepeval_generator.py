@@ -1,13 +1,12 @@
 import os
 import asyncio
 import sys
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict
 
-# 获取项目根目录的绝对路径
+# 获取项目根目录的绝对路径并添加 DeepEval 源码路径
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEEPEVAL_SOURCE_PATH = os.path.join(PROJECT_ROOT, 'deepeval_source')
 
-# 添加本地 DeepEval 源码路径到 Python 路径的最前面
 if DEEPEVAL_SOURCE_PATH not in sys.path:
     sys.path.insert(0, DEEPEVAL_SOURCE_PATH)
     print(f"🔧 已添加本地 DeepEval 源码路径: {DEEPEVAL_SOURCE_PATH}")
@@ -24,21 +23,15 @@ except ImportError as e:
     print(f"❌ DeepEval 导入失败: {e}")
     raise
 
-# 确保使用源码路径导入 - 明确指定源码路径
-import sys
-import os
-DEEPEVAL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deepeval_source')
-if DEEPEVAL_SOURCE_PATH not in sys.path:
-    sys.path.insert(0, DEEPEVAL_SOURCE_PATH)
-
+# 导入所需的模块
 from deepeval.synthesizer import Synthesizer
 from deepeval.synthesizer.config import StylingConfig
 from deepeval.dataset import EvaluationDataset
 from utils.logger import get_logger
-from config import API_CONFIG, GENERATION_CONFIG
+from config import API_CONFIG
 
 # 获取日志记录器
-logger = get_logger('deepeval_generator')
+logger = get_logger('deepeval_generator', 'app')
 
 class DeepEvalDatasetGenerator:
     """使用DeepEval生成数据集的工具类"""
@@ -73,40 +66,21 @@ class DeepEvalDatasetGenerator:
             expected_output_format="Chinese"  # 期望输出格式为中文
         )
     
-    def _calculate_batch_strategy(self, num_questions: int) -> Dict:
-        """计算分批生成策略"""
-        if num_questions <= GENERATION_CONFIG['single_batch_threshold']:
-            # 小数量：一次性生成
-            return {
-                'strategy': 'single_batch',
-                'batch_size': min(num_questions, GENERATION_CONFIG['max_single_batch_size']),
-                'num_batches': 1
-            }
-        else:
-            # 大数量：分批生成
-            batch_size = GENERATION_CONFIG['batch_size']
-            num_batches = (num_questions + batch_size - 1) // batch_size
-            return {
-                'strategy': 'multi_batch',
-                'batch_size': batch_size,
-                'num_batches': num_batches
-            }
+
     
     async def generate_from_contexts(
         self, 
         contexts: List[str], 
         num_questions: int,
-        scenario: str = "educational",
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        scenario: str = "educational"
     ) -> List[Dict]:
         """
-        从上下文生成问答对，支持分批生成和进度跟踪
+        从上下文生成问答对，一次性完成所有生成
         
         Args:
             contexts: 上下文信息列表
             num_questions: 需要生成的问题数量
             scenario: 生成场景 (educational, conversational, technical)
-            progress_callback: 进度回调函数 (completed, total, status)
             
         Returns:
             生成的问答对列表
@@ -114,165 +88,55 @@ class DeepEvalDatasetGenerator:
         try:
             logger.info(f"开始使用DeepEval生成数据集: 上下文数量={len(contexts)}, 问题数量={num_questions}")
             
-            # 计算分批策略
-            strategy = self._calculate_batch_strategy(num_questions)
-            logger.info(f"使用生成策略: {strategy['strategy']}, 批次大小: {strategy['batch_size']}, 总批次数: {strategy['num_batches']}")
-            
             # 准备上下文
             contexts_with_instruction = self._prepare_contexts_with_instruction(contexts)
             
             # 创建风格配置
             styling_config = self._create_styling_config(scenario)
             
-            all_qa_items = []
-            completed_count = 0
+            # 计算每个上下文生成的问题数量
+            max_goldens_per_context = max(1, num_questions // len(contexts_with_instruction))
             
-            # 分批生成
-            for batch_num in range(strategy['num_batches']):
-                batch_start = batch_num * strategy['batch_size']
-                batch_end = min(batch_start + strategy['batch_size'], num_questions)
-                current_batch_size = batch_end - batch_start
-                
-                logger.info(f"生成第 {batch_num + 1}/{strategy['num_batches']} 批，数量: {current_batch_size}")
-                
-                # 更新进度
-                if progress_callback:
-                    progress_callback(completed_count, num_questions, f"正在生成第 {batch_num + 1} 批...")
-                
-                # 计算当前批次每个上下文生成的问题数量
-                max_goldens_per_context = max(1, current_batch_size // len(contexts_with_instruction))
-                
-                try:
-                    # 使用DeepEval生成当前批次
-                    dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                        contexts=contexts_with_instruction,
-                        include_expected_output=True,
-                        max_goldens_per_context=max_goldens_per_context
-                    )
-                    
-                    # 转换为我们的格式
-                    batch_items = []
-                    for golden in dataset:
-                        qa_item = {
-                            'question': golden.input,
-                            'expected_output': golden.expected_output,
-                            'context': contexts,
-                            'context_length': sum(len(x) for x in contexts)
-                        }
-                        batch_items.append(qa_item)
-                    
-                    # 去重处理
-                    new_items = []
-                    existing_questions = set(item['question'] for item in all_qa_items)
-                    
-                    for item in batch_items:
-                        if item['question'] not in existing_questions:
-                            new_items.append(item)
-                            existing_questions.add(item['question'])
-                        else:
-                            logger.warning(f"发现重复问题，跳过: {item['question'][:50]}...")
-                    
-                    # 添加到总列表
-                    all_qa_items.extend(new_items)
-                    completed_count += len(new_items)
-                    
-                    logger.info(f"第 {batch_num + 1} 批完成，生成了 {len(new_items)} 个问答对")
-                    logger.info(f"总进度: {completed_count}/{num_questions} ({completed_count/num_questions*100:.1f}%)")
-                    
-                    # 更新进度
-                    if progress_callback:
-                        progress_callback(completed_count, num_questions, f"第 {batch_num + 1} 批完成")
-                    
-                    # 如果已经达到目标数量，提前结束
-                    if completed_count >= num_questions:
-                        break
-                        
-                except Exception as e:
-                    logger.error(f"第 {batch_num + 1} 批生成失败: {str(e)}")
-                    if progress_callback:
-                        progress_callback(completed_count, num_questions, f"第 {batch_num + 1} 批失败: {str(e)}")
-                    # 继续下一批，不中断整个任务
-                    continue
+            logger.info(f"一次性生成 {num_questions} 个问答对，每个上下文生成 {max_goldens_per_context} 个")
             
-            # 如果生成的问答对数量不足，继续生成直到达到目标数量
-            if len(all_qa_items) < num_questions:
-                logger.warning(f"生成的问答对数量不足 ({len(all_qa_items)}/{num_questions})，继续生成")
-                
-                if progress_callback:
-                    progress_callback(completed_count, num_questions, "继续生成补充数据...")
-                
-                # 继续生成直到达到目标数量
-                while len(all_qa_items) < num_questions:
-                    remaining = num_questions - len(all_qa_items)
-                    current_batch_size = min(strategy['batch_size'], remaining)
-                    
-                    logger.info(f"继续生成，剩余 {remaining} 个，本批生成 {current_batch_size} 个")
-                    
-                    try:
-                        # 使用DeepEval继续生成
-                        dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                            contexts=contexts_with_instruction,
-                            include_expected_output=True,
-                            max_goldens_per_context=max(1, current_batch_size // len(contexts_with_instruction))
-                        )
-                        
-                        # 转换为我们的格式
-                        batch_items = []
-                        for golden in dataset:
-                            qa_item = {
-                                'question': golden.input,
-                                'expected_output': golden.expected_output,
-                                'context': contexts,
-                                'context_length': sum(len(x) for x in contexts)
-                            }
-                            batch_items.append(qa_item)
-                        
-                        # 去重处理
-                        new_items = []
-                        existing_questions = set(item['question'] for item in all_qa_items)
-                        
-                        for item in batch_items:
-                            if item['question'] not in existing_questions:
-                                new_items.append(item)
-                                existing_questions.add(item['question'])
-                            else:
-                                logger.warning(f"发现重复问题，跳过: {item['question'][:50]}...")
-                        
-                        all_qa_items.extend(new_items)
-                        completed_count += len(new_items)
-                        
-                        logger.info(f"继续生成完成，新增 {len(new_items)} 个问答对")
-                        logger.info(f"总进度: {completed_count}/{num_questions} ({completed_count/num_questions*100:.1f}%)")
-                        
-                        # 更新进度
-                        if progress_callback:
-                            progress_callback(completed_count, num_questions, f"继续生成完成，新增 {len(new_items)} 个")
-                        
-                        if len(new_items) == 0:
-                            logger.warning("本批没有生成新的问答对，可能达到生成上限")
-                            break
-                            
-                    except Exception as e:
-                        logger.error(f"继续生成失败: {str(e)}")
-                        if progress_callback:
-                            progress_callback(completed_count, num_questions, f"继续生成失败: {str(e)}")
-                        break
+            # 使用DeepEval一次性生成所有问答对
+            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
+                contexts=contexts_with_instruction,
+                include_expected_output=True,
+                max_goldens_per_context=max_goldens_per_context
+            )
+            
+            # 转换为我们的格式
+            qa_items = []
+            for golden in dataset:
+                qa_item = {
+                    'question': golden.input,
+                    'expected_output': golden.expected_output,
+                    'context': contexts,
+                    'context_length': sum(len(x) for x in contexts)
+                }
+                qa_items.append(qa_item)
+            
+            # 去重处理
+            final_items = []
+            seen_questions = set()
+            
+            for item in qa_items:
+                if item['question'] not in seen_questions:
+                    final_items.append(item)
+                    seen_questions.add(item['question'])
+                else:
+                    logger.warning(f"发现重复问题，跳过: {item['question'][:50]}...")
             
             # 只取需要的数量
-            final_items = all_qa_items[:num_questions]
+            final_items = final_items[:num_questions]
             
             logger.info(f"DeepEval生成完成，总共生成了 {len(final_items)} 个问答对")
-            
-            # 最终进度更新
-            if progress_callback:
-                progress_callback(len(final_items), num_questions, "生成完成")
             
             return final_items
             
         except Exception as e:
             logger.error(f"DeepEval生成失败: {str(e)}")
-            if progress_callback:
-                progress_callback(0, num_questions, f"生成失败: {str(e)}")
             raise
     
     async def generate_from_documents(
@@ -327,8 +191,7 @@ class DeepEvalDatasetGenerator:
         self, 
         num_questions: int,
         scenario: str = "educational",
-        topic: str = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        topic: str = None
     ) -> List[Dict]:
         """
         从零开始生成问答对
@@ -337,7 +200,6 @@ class DeepEvalDatasetGenerator:
             num_questions: 需要生成的问题数量
             scenario: 生成场景
             topic: 主题信息（可选）
-            progress_callback: 进度回调函数
             
         Returns:
             生成的问答对列表
@@ -345,43 +207,20 @@ class DeepEvalDatasetGenerator:
         try:
             logger.info(f"开始使用DeepEval从零生成数据集: 问题数量={num_questions}, 主题={topic}")
             
-            # 心跳日志（避免长时间无输出）
-            heartbeat_running = True
-            completed_so_far = 0
-
-            async def heartbeat() -> None:
-                while heartbeat_running:
-                    try:
-                        logger.info("from-scratch 正在处理中... (心跳)")
-                        if progress_callback:
-                            progress_callback(completed_so_far, num_questions, "正在生成中文问答...")
-                    except Exception as hb_err:
-                        logger.error(f"from-scratch 心跳上报失败: {hb_err}")
-                    await asyncio.sleep(2)
-
-            hb_task = asyncio.create_task(heartbeat())
-
-            try:
-                # 创建风格配置并设置到 synthesizer
-                styling_config = self._create_styling_config(scenario)
-                
-                # 如果有主题信息，修改任务描述
-                if topic:
-                    styling_config.task = f"基于主题'{topic}'生成中文问题和答案"
-                    styling_config.scenario = f"关于{topic}的教育问答"
-                
-                self.synthesizer.styling_config = styling_config
-                
-                # 使用DeepEval生成数据集
-                dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
-                    num_goldens=num_questions
-                )
-            finally:
-                heartbeat_running = False
-                try:
-                    hb_task.cancel()
-                except Exception:
-                    pass
+            # 创建风格配置并设置到 synthesizer
+            styling_config = self._create_styling_config(scenario)
+            
+            # 如果有主题信息，修改任务描述
+            if topic:
+                styling_config.task = f"基于主题'{topic}'生成中文问题和答案"
+                styling_config.scenario = f"关于{topic}的教育问答"
+            
+            self.synthesizer.styling_config = styling_config
+            
+            # 使用DeepEval生成数据集
+            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
+                num_goldens=num_questions
+            )
             
             # 转换为我们的格式
             qa_items = []
@@ -397,19 +236,14 @@ class DeepEvalDatasetGenerator:
                 }
                 qa_items.append(qa_item)
             
-            completed_so_far = len(qa_items)
             logger.info(f"DeepEval从零生成完成，共生成 {len(qa_items)} 个中文问答对")
             
-            # 最终进度更新
-            if progress_callback:
-                progress_callback(completed_so_far, num_questions, "生成完成")
+
             
             return qa_items
             
         except Exception as e:
             logger.error(f"DeepEval从零生成失败: {str(e)}")
-            if progress_callback:
-                progress_callback(0, num_questions, f"生成失败: {str(e)}")
             raise
     
     async def generate_from_goldens(
@@ -432,9 +266,7 @@ class DeepEvalDatasetGenerator:
         try:
             logger.info(f"开始从Golden数据集生成扩写数据: 原始数据={len(goldens)}, 目标数量={num_questions}")
             
-            # 计算分批策略
-            batch_strategy = self._calculate_batch_strategy(num_questions)
-            logger.info(f"使用分批策略: {batch_strategy}")
+
             
             # 创建风格配置
             styling_config = self._create_styling_config(scenario)
@@ -467,8 +299,6 @@ class DeepEvalDatasetGenerator:
             
         except Exception as e:
             logger.error(f"DeepEval从Golden扩写失败: {str(e)}")
-            if progress_callback:
-                progress_callback(0, num_questions, f"扩写失败: {str(e)}")
             raise
     
     def save_dataset(self, qa_items: List[Dict], file_path: str, file_type: str = 'csv'):

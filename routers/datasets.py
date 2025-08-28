@@ -6,7 +6,7 @@ import io
 import sys
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi import HTTPException
 from database import TaskManager
 from datetime import datetime
@@ -33,7 +33,7 @@ from schemas import (
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 # 获取日志记录器
-logger = get_logger('datasets')
+logger = get_logger('datasets', 'business')
 
 # 创建任务管理器实例
 task_manager = TaskManager()
@@ -88,9 +88,8 @@ async def generate_from_document(
     if len(content_bytes) > FILE_CONFIG['max_file_size']:
         raise HTTPException(status_code=400, detail="文件过大")
 
-    # 生成任务名称与输入摘要
+    # 生成任务名称
     task_name = generate_task_name("document")
-    input_content = f"文件名: {document.filename}; 大小: {len(content_bytes)} bytes"
 
     task_id = task_manager.create_task(
         task_name=task_name,
@@ -123,13 +122,6 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         temp_path = os.path.join(temp_dir, f"upload_{timestamp}.{suffix}")
         with open(temp_path, 'wb') as f:
             f.write(content_bytes)
-
-        # 进度回调（文档路径只有一份，按完成条数更新）
-        def progress_callback(completed: int, total: int, status: str):
-            try:
-                task_manager.update_task_status(task_id, "running", completed_items=completed)
-            except Exception as e:
-                logger.error(f"文档任务进度更新失败: {str(e)}")
 
         qa_items = await deepeval_generator.generate_from_documents(
             document_paths=[temp_path],
@@ -166,7 +158,9 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         )
         logger.info(f"文档任务 {task_id} 完成，生成 {len(final_items)} 条，文件: {output_path}")
     except Exception as e:
-        logger.error(f"文档任务 {task_id} 失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"文档任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
         task_manager.update_task_status(task_id, "failed", error_message=str(e))
 
 
@@ -232,25 +226,11 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
 
         logger.info(f"使用DeepEval生成数据集: 上下文数量={len(payload.contexts)}, 问题数量={payload.num_questions}")
 
-        # 定义进度回调函数
-        def progress_callback(completed: int, total: int, status: str):
-            """进度回调函数，更新数据库中的任务进度"""
-            try:
-                task_manager.update_task_status(
-                    task_id, 
-                    "running", 
-                    completed_items=completed
-                )
-                logger.info(f"任务 {task_id} 进度: {completed}/{total} ({completed/total*100:.1f}%) - {status}")
-            except Exception as e:
-                logger.error(f"更新任务进度失败: {str(e)}")
-        
-        # 使用DeepEval生成数据集，带进度跟踪
+        # 使用DeepEval生成数据集
         qa_items = await deepeval_generator.generate_from_contexts(
             contexts=payload.contexts,
             num_questions=payload.num_questions,
-            scenario="educational",
-            progress_callback=progress_callback
+            scenario="educational"
         )
 
         # 检查DeepEval生成结果
@@ -301,7 +281,9 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
 
     except Exception as e:
         # 如果处理失败，更新任务状态为失败
-        logger.error(f"任务 {task_id} 处理失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"任务 {task_id} 处理失败: {str(e)}\n错误详情: {error_details}")
         task_manager.update_task_status(
             task_id,
             "failed",
@@ -309,7 +291,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
         )
 
 
-@router.post("/from-topic", summary="根据主题生成数据集（同步）")
+@router.post("/from-topic", summary="根据主题生成数据集（异步）")
 async def generate_from_topic(payload: FromTopicRequest):
     logger.info(f"主题生成请求: 主题={payload.topic}, 数量={payload.num_questions}")
 
@@ -317,13 +299,46 @@ async def generate_from_topic(payload: FromTopicRequest):
     if payload.num_questions < 1 or payload.num_questions > 200:
         raise HTTPException(status_code=400, detail="期望生成的问题数量需在 1~200 之间")
 
+    # 生成任务名称
+    task_name = generate_task_name("topic")
+
+    # 创建任务
+    task_id = task_manager.create_task(
+        task_name=task_name,
+        generation_type="topic",
+        total_items=payload.num_questions
+    )
+    if not task_id:
+        raise HTTPException(status_code=500, detail="创建任务失败")
+
+    # 启动异步处理
+    asyncio.create_task(process_topic_generation(
+        task_id=task_id,
+        topic=payload.topic,
+        num_questions=payload.num_questions
+    ))
+
+    return {
+        "status": "success",
+        "message": "主题生成任务已启动",
+        "data": {
+            "task_id": task_id,
+            "task_name": task_name,
+            "total_items": payload.num_questions
+        }
+    }
+
+
+async def process_topic_generation(task_id: int, topic: str, num_questions: int):
+    logger.info(f"开始处理主题生成任务: ID={task_id}, 主题={topic}, 数量={num_questions}")
     try:
-        # 直接调用生成方法，不使用异步任务
+        task_manager.update_task_status(task_id, "running")
+
+        # 调用生成方法
         qa_items = await deepeval_generator.generate_from_scratch(
-            num_questions=payload.num_questions,
+            num_questions=num_questions,
             scenario="educational",
-            topic=payload.topic,  # 传递主题信息
-            progress_callback=None  # 不使用进度回调
+            topic=topic
         )
 
         if not qa_items:
@@ -335,8 +350,8 @@ async def generate_from_topic(payload: FromTopicRequest):
             final_items.append(QAItem(
                 question=item['question'],
                 expected_output=item['expected_output'],
-                context=[f"主题: {payload.topic}"],  # 将主题作为上下文
-                context_length=len(payload.topic)
+                context=[f"主题: {topic}"],  # 将主题作为上下文
+                context_length=len(topic)
             ))
 
         # 保存CSV
@@ -355,22 +370,19 @@ async def generate_from_topic(payload: FromTopicRequest):
             combined = f"{first.question} {first.expected_output}"
             preview_text = (combined if len(combined) <= 50 else combined[:50] + "...")
 
-        logger.info(f"主题生成完成，生成了 {len(final_items)} 个问答对，文件保存至: {output_path}")
-
-        return {
-            "status": "success",
-            "message": f"成功生成 {len(final_items)} 个问答对",
-            "data": {
-                "total_items": len(final_items),
-                "output_file_path": output_path,
-                "preview": preview_text,
-                "qa_items": [item.dict() for item in final_items]
-            }
-        }
-
+        task_manager.update_task_status(
+            task_id,
+            "completed",
+            completed_items=len(final_items),
+            output_file_path=output_path,
+            preview=preview_text
+        )
+        logger.info(f"主题任务 {task_id} 完成，生成 {len(final_items)} 条，文件: {output_path}")
     except Exception as e:
-        logger.error(f"主题生成失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"主题任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
+        task_manager.update_task_status(task_id, "failed", error_message=str(e))
 
 
 @router.post("/augment", summary="根据数据集扩写数据集（异步）")
@@ -429,7 +441,7 @@ async def augment_dataset(
 
     # 创建任务
     task_name = generate_task_name("augment")
-    input_content = f"原始样本: {base_count}; 生成比例: {ratio}; 目标数量: {target_num}"
+
     task_id = task_manager.create_task(
         task_name=task_name,
         generation_type="augment",
@@ -456,7 +468,7 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
 
         # 将上下文转换为Golden对象
         # 确保使用源码路径导入
-        from deepeval.test_case import Golden
+        from deepeval.dataset.golden import Golden
             
         goldens = []
         for context in contexts:
@@ -501,16 +513,30 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
         )
         logger.info(f"扩写任务 {task_id} 完成，生成 {len(augment_items)} 条，文件: {output_path}")
     except Exception as e:
-        logger.error(f"扩写任务 {task_id} 失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"扩写任务 {task_id} 失败: {str(e)}\n错误详情: {error_details}")
         task_manager.update_task_status(task_id, "failed", error_message=str(e))
 
 
 @router.get("/template", summary="下载扩写模板CSV")
 async def download_template():
     logger.info("下载扩写模板")
-    content = "input,expected_output\n\"问题示例1\",\"答案示例1\"\n\"问题示例2\",\"答案示例2\"\n"
-    return StreamingResponse(
-        iter([content.encode("utf-8")]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=template.csv"},
+    
+    # 直接使用当前工作目录
+    template_file_path = os.path.join(os.getcwd(), "dataset_template.csv")
+    
+    # 检查文件是否存在
+    if not os.path.exists(template_file_path):
+        logger.error(f"模板文件不存在: {template_file_path}")
+        raise HTTPException(status_code=404, detail="模板文件不存在")
+    
+    # 返回文件下载响应
+    return FileResponse(
+        path=template_file_path,
+        filename="dataset_template.csv",
+        media_type="text/csv",
+        headers={
+            'Content-Disposition': 'attachment; filename="dataset_template.csv"'
+        }
     )

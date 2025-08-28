@@ -69,16 +69,7 @@ LOG_CONFIG = {
     'encoding': 'utf-8'
 }
 
-# 生成参数配置
-GENERATION_CONFIG = {
-    'batch_size': int(os.getenv('GENERATION_BATCH_SIZE', 3)),  # 每批生成数量
-    'max_retries': int(os.getenv('GENERATION_MAX_RETRIES', 3)),  # 最大重试次数
-    'timeout': int(os.getenv('GENERATION_TIMEOUT', 30)),  # API超时时间(秒)
-    'temperature': float(os.getenv('GENERATION_TEMPERATURE', 0.7)),  # 生成温度
-    'max_tokens': int(os.getenv('GENERATION_MAX_TOKENS', 2000)),  # 最大token数
-    'single_batch_threshold': int(os.getenv('SINGLE_BATCH_THRESHOLD', 10)),  # 单批生成阈值
-    'max_single_batch_size': int(os.getenv('MAX_SINGLE_BATCH_SIZE', 15)),  # 单批最大生成数量
-}
+
 
 # 打印当前环境信息
 print(f"🌍 当前环境: {ENV}")

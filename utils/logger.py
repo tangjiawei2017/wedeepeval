@@ -4,12 +4,13 @@ import os
 from datetime import datetime
 from config import LOG_CONFIG
 
-def setup_logger(name: str = 'wedeepeval') -> logging.Logger:
+def setup_logger(name: str = 'wedeepeval', log_type: str = 'app') -> logging.Logger:
     """
     设置日志记录器
     
     Args:
         name: 日志记录器名称
+        log_type: 日志类型 ('app' 用于系统日志, 'business' 用于业务日志)
         
     Returns:
         配置好的日志记录器
@@ -37,9 +38,14 @@ def setup_logger(name: str = 'wedeepeval') -> logging.Logger:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # 文件处理器 - 只使用一个日志文件
-    today = datetime.now().strftime('%Y-%m-%d')
-    log_file = os.path.join(log_dir, f'wedeepeval_{today}.log')
+    # 文件处理器 - 根据日志类型选择不同的文件
+    if log_type == 'app':
+        # app.log 用于系统启动、错误等日志
+        log_file = os.path.join(log_dir, 'app.log')
+    else:
+        # wedeepeval_*.log 用于业务请求日志
+        today = datetime.now().strftime('%Y-%m-%d')
+        log_file = os.path.join(log_dir, f'wedeepeval_{today}.log')
     
     file_handler = logging.handlers.RotatingFileHandler(
         log_file,
@@ -53,20 +59,21 @@ def setup_logger(name: str = 'wedeepeval') -> logging.Logger:
     
     return logger
 
-def get_logger(name: str = 'deepeval') -> logging.Logger:
+def get_logger(name: str = 'deepeval', log_type: str = 'business') -> logging.Logger:
     """
     获取日志记录器
     
     Args:
         name: 日志记录器名称
+        log_type: 日志类型 ('app' 用于系统日志, 'business' 用于业务日志)
         
     Returns:
         日志记录器实例
     """
-    logger = logging.getLogger(name)
+    logger = logging.getLogger(f"{name}_{log_type}")
     if not logger.handlers:
-        logger = setup_logger(name)
+        logger = setup_logger(name, log_type)
     return logger
 
 # 创建默认日志记录器
-default_logger = get_logger() 
+default_logger = get_logger('deepeval', 'business') 

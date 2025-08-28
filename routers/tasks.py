@@ -27,16 +27,26 @@ class TaskResponse(BaseModel):
     class Config:
         from_attributes = True
     
-    @classmethod
-    def from_db_task(cls, task_dict: Dict):
-        """从数据库任务字典创建响应模型"""
-        # 确保日期时间字段是字符串格式
-        if task_dict.get('created_at') and isinstance(task_dict['created_at'], datetime):
-            task_dict['created_at'] = task_dict['created_at'].isoformat()
-        if task_dict.get('updated_at') and isinstance(task_dict['updated_at'], datetime):
-            task_dict['updated_at'] = task_dict['updated_at'].isoformat()
-        
-        return cls(**task_dict)
+    def __init__(self, **data):
+        # 确保时间字段使用正确的格式
+        if 'created_at' in data and data['created_at']:
+            if isinstance(data['created_at'], str) and 'T' in data['created_at']:
+                # 将 T 格式转换为空格格式
+                data['created_at'] = data['created_at'].replace('T', ' ')
+        if 'updated_at' in data and data['updated_at']:
+            if isinstance(data['updated_at'], str) and 'T' in data['updated_at']:
+                # 将 T 格式转换为空格格式
+                data['updated_at'] = data['updated_at'].replace('T', ' ')
+        super().__init__(**data)
+    
+    def dict(self, *args, **kwargs):
+        """重写 dict 方法，确保时间格式正确"""
+        result = super().dict(*args, **kwargs)
+        if result.get('created_at') and isinstance(result['created_at'], str) and 'T' in result['created_at']:
+            result['created_at'] = result['created_at'].replace('T', ' ')
+        if result.get('updated_at') and isinstance(result['updated_at'], str) and 'T' in result['updated_at']:
+            result['updated_at'] = result['updated_at'].replace('T', ' ')
+        return result
 
 @router.get("/list", response_model=List[TaskResponse], summary="获取所有任务")
 async def get_all_tasks():
@@ -45,8 +55,16 @@ async def get_all_tasks():
     """
     try:
         tasks = task_manager.get_all_tasks()
-        # 使用新的转换方法
-        return [TaskResponse.from_db_task(task) for task in tasks]
+        
+        # 处理每个任务的时间格式
+        for task in tasks:
+            if task.get('created_at') and isinstance(task['created_at'], str) and 'T' in task['created_at']:
+                task['created_at'] = task['created_at'].replace('T', ' ')
+            if task.get('updated_at') and isinstance(task['updated_at'], str) and 'T' in task['updated_at']:
+                task['updated_at'] = task['updated_at'].replace('T', ' ')
+        
+        # 直接使用 TaskResponse 模型
+        return [TaskResponse(**task) for task in tasks]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
 
@@ -59,8 +77,15 @@ async def get_task(task_id: int):
         task = task_manager.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
-        # 使用新的转换方法
-        return TaskResponse.from_db_task(task)
+        
+        # 处理时间格式
+        if task.get('created_at') and isinstance(task['created_at'], str) and 'T' in task['created_at']:
+            task['created_at'] = task['created_at'].replace('T', ' ')
+        if task.get('updated_at') and isinstance(task['updated_at'], str) and 'T' in task['updated_at']:
+            task['updated_at'] = task['updated_at'].replace('T', ' ')
+        
+        # 直接使用 TaskResponse 模型
+        return TaskResponse(**task)
     except HTTPException:
         raise
     except Exception as e:

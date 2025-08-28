@@ -9,8 +9,8 @@ from utils.logger import get_logger
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-# 获取日志记录器
-logger = get_logger('main')
+# 获取日志记录器 - 使用系统日志类型
+logger = get_logger('main', 'app')
 
 app = FastAPI(
     title="WeDeepEval Dataset APIs", 
@@ -44,7 +44,10 @@ app.include_router(tasks_router)
 
 @app.get("/", tags=["Health"])
 async def root():
-    logger.info("健康检查接口被调用")
+    # 使用业务日志记录健康检查
+    from utils.logger import get_logger
+    business_logger = get_logger('main', 'business')
+    business_logger.info("健康检查接口被调用")
     return {"message": "WeDeepEval dataset service is running", "docs": "/docs"}
 
 
