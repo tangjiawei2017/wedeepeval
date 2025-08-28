@@ -1,9 +1,12 @@
 import os
 from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
+BASE_DIR = Path(__file__).parent.resolve()
 # 根据环境变量加载对应的配置文件
-ENV = os.getenv('ENV', 'development')  # 默认开发环境
-env_file = f'env.{ENV}'
+ENV = os.getenv('ENV', 'production')  # 默认开发环境
+env_file = BASE_DIR / f'env.{ENV}'
 
 if os.path.exists(env_file):
     load_dotenv(env_file)
@@ -36,9 +39,9 @@ API_CONFIG = {
 
 # Embedding模型配置
 EMBEDDING_CONFIG = {
-    'embedding_api_key': os.getenv('EMBEDDING_API_KEY', ''),
-    'embedding_base_url': os.getenv('EMBEDDING_BASE_URL', 'https://api.gpt.ge/v1/'),
-    'embedding_model_name': os.getenv('EMBEDDING_MODEL_NAME', 'text-embedding-3-large')
+    'embedding_api_key': os.getenv('OPENAI_API_KEY', ''),
+    'embedding_base_url': os.getenv('OPENAI_BASE_URL', 'https://api.gpt.ge/v1/'),
+    'embedding_model': os.getenv('EMBEDDING_MODEL', 'text-embedding-3-large')
 }
 
 # 服务器配置
@@ -82,4 +85,5 @@ print(f"🌍 当前环境: {ENV}")
 print(f"🔧 调试模式: {BASE_CONFIG['debug']}")
 print(f"🗄️  数据库: {DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}")
 print(f"🌐 服务器: {SERVER_CONFIG['host']}:{SERVER_CONFIG['port']}")
+print(f"OPENAI CONFIG: openai_api_key:{API_CONFIG['openai_api_key']},openai_base_url:{API_CONFIG['openai_base_url']}")
 print(f"📝 日志目录: {LOG_CONFIG['log_dir']}") 
