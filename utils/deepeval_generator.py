@@ -24,6 +24,13 @@ except ImportError as e:
     print(f"❌ DeepEval 导入失败: {e}")
     raise
 
+# 确保使用源码路径导入 - 明确指定源码路径
+import sys
+import os
+DEEPEVAL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deepeval_source')
+if DEEPEVAL_SOURCE_PATH not in sys.path:
+    sys.path.insert(0, DEEPEVAL_SOURCE_PATH)
+
 from deepeval.synthesizer import Synthesizer
 from deepeval.synthesizer.config import StylingConfig
 from deepeval.dataset import EvaluationDataset
@@ -477,6 +484,7 @@ class DeepEvalDatasetGenerator:
             # 创建临时数据集用于保存
             temp_dataset = []
             for item in qa_items:
+                # 确保使用源码路径导入
                 from deepeval.dataset import Golden
                 golden = Golden(
                     input=item['question'],

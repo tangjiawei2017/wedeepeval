@@ -3,6 +3,7 @@ import os
 import asyncio
 import csv
 import io
+import sys
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,12 @@ from fastapi import HTTPException
 from database import TaskManager
 from datetime import datetime
 from config import FILE_CONFIG
+
+# 确保使用源码路径导入 DeepEval
+DEEPEVAL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deepeval_source')
+if DEEPEVAL_SOURCE_PATH not in sys.path:
+    sys.path.insert(0, DEEPEVAL_SOURCE_PATH)
+
 from utils.deepeval_generator import deepeval_generator
 from utils.logger import get_logger
 from schemas import (
@@ -448,6 +455,7 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
         task_manager.update_task_status(task_id, "running")
 
         # 将上下文转换为Golden对象
+        # 确保使用源码路径导入
         from deepeval.test_case import Golden
             
         goldens = []
