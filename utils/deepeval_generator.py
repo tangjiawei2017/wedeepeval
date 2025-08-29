@@ -111,13 +111,24 @@ class DeepEvalDatasetGenerator:
                 base_url=EMBEDDING_CONFIG['embedding_base_url']
             )
             
+            # 导入配置类
+            from deepeval.synthesizer.config import ContextConstructionConfig
+            
+            # 创建上下文构建配置，指定自定义嵌入模型
+            context_config = ContextConstructionConfig(
+                embedder=embedder,  # 使用自定义嵌入模型
+                critic_model=API_CONFIG['openai_model']
+            )
+            
             self.synthesizer = Synthesizer(
                 model=API_CONFIG['openai_model'],
-                embedder=embedder,  # 指定自定义嵌入模型
                 async_mode=True,
                 max_concurrent=5,  # 增加并发数，提高性能
                 cost_tracking=False
             )
+            
+            # 保存上下文配置，供后续使用
+            self.context_config = context_config
             
             # 设置默认的styling_config
             from deepeval.synthesizer.config import StylingConfig
@@ -292,7 +303,8 @@ class DeepEvalDatasetGenerator:
                         self.synthesizer.a_generate_goldens_from_docs(
                             document_paths=document_paths,
                             include_expected_output=True,
-                            max_goldens_per_context=max_goldens_per_context
+                            max_goldens_per_context=max_goldens_per_context,
+                            context_construction_config=self.context_config  # 使用自定义上下文配置
                         )
                     )
                 finally:
