@@ -46,7 +46,7 @@ class DeepEvalDatasetGenerator:
             os.environ["OPENAI_BASE_URL"] = API_CONFIG['openai_base_url']
             
             logger.info(f"API配置: {API_CONFIG['openai_base_url']}")
-            logger.info(f"并发数: 1, 异步模式")
+            logger.info(f"并发数: 5, 异步模式")
             
             # 初始化Synthesizer
             logger.info("开始创建Synthesizer实例...")
