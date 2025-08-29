@@ -69,6 +69,17 @@ LOG_CONFIG = {
     'encoding': 'utf-8'
 }
 
+# 生成参数配置
+GENERATION_CONFIG = {
+    'batch_size': int(os.getenv('GENERATION_BATCH_SIZE', 1)),
+    'max_retries': int(os.getenv('GENERATION_MAX_RETRIES', 3)),
+    'timeout': int(os.getenv('GENERATION_TIMEOUT', 30)),  # 30秒
+    'temperature': float(os.getenv('GENERATION_TEMPERATURE', 0.7)),
+    'max_tokens': int(os.getenv('GENERATION_MAX_TOKENS', 1000)),
+    'single_batch_threshold': int(os.getenv('SINGLE_BATCH_THRESHOLD', 5)),
+    'max_single_batch_size': int(os.getenv('MAX_SINGLE_BATCH_SIZE', 8))
+}
+
 # Preview配置
 PREVIEW_CONFIG = {
     'max_length': int(os.getenv('PREVIEW_MAX_LENGTH', 60)),  # preview字段最大长度限制

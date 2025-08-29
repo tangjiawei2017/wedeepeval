@@ -126,9 +126,13 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         with open(temp_path, 'wb') as f:
             f.write(content_bytes)
 
-        qa_items = await deepeval_generator.generate_from_documents(
-            document_paths=[temp_path],
-            num_questions=num_questions
+        # 使用create_task确保大模型调用不会阻塞服务进程
+        logger.info(f"开始异步调用大模型生成文档数据...")
+        qa_items = await asyncio.create_task(
+            deepeval_generator.generate_from_documents(
+                document_paths=[temp_path],
+                num_questions=num_questions
+            )
         )
         if not qa_items:
             raise Exception("未生成任何问答对")
@@ -271,10 +275,13 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
             except Exception as e:
                 logger.error(f"更新任务进度失败: {str(e)}")
 
-        # 使用DeepEval生成数据集
-        qa_items = await deepeval_generator.generate_from_contexts(
-            contexts=payload.contexts,
-            num_questions=payload.num_questions
+        # 使用create_task确保大模型调用不会阻塞服务进程
+        logger.info(f"开始异步调用大模型生成上下文数据...")
+        qa_items = await asyncio.create_task(
+            deepeval_generator.generate_from_contexts(
+                contexts=payload.contexts,
+                num_questions=payload.num_questions
+            )
         )
 
         # 检查DeepEval生成结果
@@ -385,11 +392,14 @@ async def process_topic_generation(task_id: int, topic: str, task_description: s
     try:
         await asyncio.to_thread(task_manager.update_task_status, task_id, "running")
 
-        # 调用生成方法
-        qa_items = await deepeval_generator.generate_from_scratch(
-            num_questions=num_questions,
-            topic=topic,
-            scenario=scene_description
+        # 使用create_task确保大模型调用不会阻塞服务进程
+        logger.info(f"开始异步调用大模型生成数据...")
+        qa_items = await asyncio.create_task(
+            deepeval_generator.generate_from_scratch(
+                num_questions=num_questions,
+                topic=topic,
+                scenario=scene_description
+            )
         )
 
         if not qa_items:
@@ -531,10 +541,13 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
             golden = Golden(input=context)
             goldens.append(golden)
         
-        # 使用DeepEval的generate_goldens_from_goldens方法进行数据集扩写
-        qa_items = await deepeval_generator.generate_from_goldens(
-            goldens=goldens,
-            num_questions=target_num
+        # 使用create_task确保大模型调用不会阻塞服务进程
+        logger.info(f"开始异步调用大模型生成扩写数据...")
+        qa_items = await asyncio.create_task(
+            deepeval_generator.generate_from_goldens(
+                goldens=goldens,
+                num_questions=target_num
+            )
         )
         if not qa_items:
             raise Exception("未生成任何扩写数据")

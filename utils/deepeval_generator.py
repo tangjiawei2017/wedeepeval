@@ -28,7 +28,7 @@ from deepeval.synthesizer import Synthesizer
 from deepeval.synthesizer.config import StylingConfig
 from deepeval.dataset import EvaluationDataset
 from utils.logger import get_logger
-from config import API_CONFIG
+from config import API_CONFIG, GENERATION_CONFIG
 
 # 获取日志记录器
 logger = get_logger('deepeval_generator', 'business')
@@ -46,7 +46,7 @@ class DeepEvalDatasetGenerator:
             os.environ["OPENAI_BASE_URL"] = API_CONFIG['openai_base_url']
             
             logger.info(f"API配置: {API_CONFIG['openai_base_url']}")
-            logger.info(f"并发数: {API_CONFIG.get('max_concurrent', 10)}, 超时: {API_CONFIG.get('timeout', 30)}秒, 重试: {API_CONFIG.get('max_retries', 2)}次")
+            logger.info(f"并发数: 1, 异步模式")
             
             # 初始化Synthesizer
             logger.info("开始创建Synthesizer实例...")
@@ -130,32 +130,12 @@ class DeepEvalDatasetGenerator:
 
             # 使用DeepEval一次性生成所有问答对
             logger.info("开始调用DeepEval API生成问答对...")
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
-                    dataset: EvaluationDataset = await asyncio.wait_for(
-                        self.synthesizer.a_generate_goldens_from_contexts(
-                            contexts=contexts_with_instruction,
-                            include_expected_output=True,
-                            max_goldens_per_context=max_goldens_per_context
-                        ),
-                        timeout=120  # 2分钟超时
-                    )
-                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
-                    break
-                except asyncio.TimeoutError:
-                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
-                    if attempt == max_retries - 1:
-                        raise Exception("DeepEval API调用超时，请检查网络连接")
-                    await asyncio.sleep(2)  # 等待2秒后重试
-                except Exception as e:
-                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
-                    import traceback
-                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
-                    if attempt == max_retries - 1:
-                        raise e
-                    await asyncio.sleep(2)  # 等待2秒后重试
+            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
+                contexts=contexts_with_instruction,
+                include_expected_output=True,
+                max_goldens_per_context=max_goldens_per_context
+            )
+            logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
             qa_items = []
@@ -223,32 +203,12 @@ class DeepEvalDatasetGenerator:
             
             # 使用DeepEval生成数据集
             logger.info("开始调用DeepEval API生成文档问答对...")
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
-                    dataset: EvaluationDataset = await asyncio.wait_for(
-                        self.synthesizer.a_generate_goldens_from_docs(
-                            document_paths=document_paths,
-                            include_expected_output=True,
-                            max_goldens_per_context=max_goldens_per_context
-                        ),
-                        timeout=120  # 2分钟超时
-                    )
-                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
-                    break
-                except asyncio.TimeoutError:
-                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
-                    if attempt == max_retries - 1:
-                        raise Exception("DeepEval API调用超时，请检查网络连接")
-                    await asyncio.sleep(2)  # 等待2秒后重试
-                except Exception as e:
-                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
-                    import traceback
-                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
-                    if attempt == max_retries - 1:
-                        raise e
-                    await asyncio.sleep(2)  # 等待2秒后重试
+            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_docs(
+                document_paths=document_paths,
+                include_expected_output=True,
+                max_goldens_per_context=max_goldens_per_context
+            )
+            logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
             qa_items = []
@@ -317,32 +277,12 @@ class DeepEvalDatasetGenerator:
             logger.info("设置synthesizer的styling_config...")
             self.synthesizer.styling_config = styling_config
             
-            # 使用DeepEval生成数据集，添加重试机制
+            # 使用DeepEval生成数据集
             logger.info("开始调用DeepEval API...")
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
-                    dataset: EvaluationDataset = await asyncio.wait_for(
-                        self.synthesizer.a_generate_goldens_from_scratch(
-                            num_goldens=num_questions
-                        ),
-                        timeout=120  # 2分钟超时
-                    )
-                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
-                    break
-                except asyncio.TimeoutError:
-                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
-                    if attempt == max_retries - 1:
-                        raise Exception("DeepEval API调用超时，请检查网络连接")
-                    await asyncio.sleep(2)  # 等待2秒后重试
-                except Exception as e:
-                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
-                    import traceback
-                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
-                    if attempt == max_retries - 1:
-                        raise e
-                    await asyncio.sleep(2)  # 等待2秒后重试
+            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
+                num_goldens=num_questions
+            )
+            logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
             qa_items = []
@@ -401,15 +341,35 @@ class DeepEvalDatasetGenerator:
             max_goldens_per_golden = max(1, num_questions // len(goldens))
 
             # 使用DeepEval的generate_goldens_from_goldens方法
+            logger.info(f"开始调用DeepEval a_generate_goldens_from_goldens，输入goldens数量: {len(goldens)}")
             new_goldens = await self.synthesizer.a_generate_goldens_from_goldens(
                 goldens=goldens,
                 max_goldens_per_golden=max_goldens_per_golden,
                 include_expected_output=True
             )
+            logger.info(f"DeepEval返回new_goldens数量: {len(new_goldens)}")
             
             # 转换为我们的格式
             qa_items = []
-            for golden in new_goldens[:num_questions]:  # 限制数量
+            for i, golden in enumerate(new_goldens[:num_questions]):  # 限制数量
+                logger.info(f"处理第{i+1}个Golden对象: {type(golden)}")
+                logger.info(f"Golden对象属性: {dir(golden)}")
+                
+                # 处理Golden对象可能缺少input字段的情况
+                if not hasattr(golden, 'input') or not golden.input:
+                    logger.warning(f"Golden对象缺少input字段，跳过: {golden}")
+                    # 尝试从其他字段获取数据
+                    if hasattr(golden, 'expected_output') and golden.expected_output:
+                        logger.info(f"尝试使用expected_output作为input: {golden.expected_output[:50]}...")
+                        qa_item = {
+                            'question': golden.expected_output,
+                            'expected_output': "暂无标准答案",
+                            'context': golden.context if golden.context else [],
+                            'context_length': len(str(golden.context)) if golden.context else 0
+                        }
+                        qa_items.append(qa_item)
+                    continue
+                
                 qa_item = {
                     'question': golden.input,
                     'expected_output': golden.expected_output if golden.expected_output else "暂无标准答案",
