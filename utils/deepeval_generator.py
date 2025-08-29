@@ -50,8 +50,70 @@ class DeepEvalDatasetGenerator:
             
             # 初始化Synthesizer
             logger.info("开始创建Synthesizer实例...")
+            
+            # 导入自定义嵌入模型
+            from deepeval.models import DeepEvalBaseEmbeddingModel
+            from openai import OpenAI, AsyncOpenAI
+            from config import EMBEDDING_CONFIG
+            
+            # 创建自定义嵌入模型，支持你的API
+            class CustomEmbeddingModel(DeepEvalBaseEmbeddingModel):
+                def __init__(self, model_name: str, api_key: str, base_url: str):
+                    self.model_name = model_name
+                    self.api_key = api_key
+                    self.base_url = base_url
+                    super().__init__(model_name)
+                
+                def load_model(self, async_mode: bool = False):
+                    if not async_mode:
+                        return OpenAI(api_key=self.api_key, base_url=self.base_url)
+                    return AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+                
+                def embed_text(self, text: str) -> List[float]:
+                    client = self.load_model(async_mode=False)
+                    response = client.embeddings.create(
+                        input=text,
+                        model=self.model_name,
+                    )
+                    return response.data[0].embedding
+                
+                def embed_texts(self, texts: List[str]) -> List[List[float]]:
+                    client = self.load_model(async_mode=False)
+                    response = client.embeddings.create(
+                        input=texts,
+                        model=self.model_name,
+                    )
+                    return [item.embedding for item in response.data]
+                
+                async def a_embed_text(self, text: str) -> List[float]:
+                    client = self.load_model(async_mode=True)
+                    response = await client.embeddings.create(
+                        input=text,
+                        model=self.model_name,
+                    )
+                    return response.data[0].embedding
+                
+                async def a_embed_texts(self, texts: List[str]) -> List[List[float]]:
+                    client = self.load_model(async_mode=True)
+                    response = await client.embeddings.create(
+                        input=texts,
+                        model=self.model_name,
+                    )
+                    return [item.embedding for item in response.data]
+                
+                def get_model_name(self) -> str:
+                    return self.model_name
+            
+            # 创建自定义嵌入模型实例
+            embedder = CustomEmbeddingModel(
+                model_name=EMBEDDING_CONFIG['embedding_model'],
+                api_key=EMBEDDING_CONFIG['embedding_api_key'],
+                base_url=EMBEDDING_CONFIG['embedding_base_url']
+            )
+            
             self.synthesizer = Synthesizer(
                 model=API_CONFIG['openai_model'],
+                embedder=embedder,  # 指定自定义嵌入模型
                 async_mode=True,
                 max_concurrent=5,  # 增加并发数，提高性能
                 cost_tracking=False
