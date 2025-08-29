@@ -57,7 +57,19 @@ def save_qa_csv_with_pandas(items: List[QAItem], output_path: str) -> None:
             'context_length': item.context_length,
         })
     df = pd.DataFrame(rows, columns=['question', 'expected_output', 'context', 'context_length'])
-    df.to_csv(output_path, index=False, encoding='utf-8-sig', line_terminator='\r\n')
+    try:
+        # 新版 pandas（>=1.5）
+        df.to_csv(output_path, index=False, encoding='utf-8-sig', lineterminator='\r\n')
+    except TypeError:
+        # 旧版 pandas 没有 lineterminator 参数，先写入，再替换换行
+        df.to_csv(output_path, index=False, encoding='utf-8-sig')
+        # 将 \n 统一替换为 \r\n
+        with open(output_path, 'rb') as f:
+            data = f.read()
+        data = data.replace(b'\r\n', b'\n')  # 先标准化，避免重复 CR
+        data = data.replace(b'\n', b'\r\n')
+        with open(output_path, 'wb') as f:
+            f.write(data)
 
 
 @router.post("/from-document", summary="根据文档生成数据集（异步）")
