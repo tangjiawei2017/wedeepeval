@@ -128,13 +128,28 @@ class DeepEvalDatasetGenerator:
             # 设置风格配置
             self.synthesizer.styling_config = styling_config
 
-            # 使用DeepEval一次性生成所有问答对
+            # 使用DeepEval一次性生成所有问答对 - 在线程池中执行，避免阻塞主线程
             logger.info("开始调用DeepEval API生成问答对...")
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                contexts=contexts_with_instruction,
-                include_expected_output=True,
-                max_goldens_per_context=max_goldens_per_context
-            )
+            
+            # 创建一个同步包装函数
+            def sync_generate_from_contexts():
+                import asyncio
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        self.synthesizer.a_generate_goldens_from_contexts(
+                            contexts=contexts_with_instruction,
+                            include_expected_output=True,
+                            max_goldens_per_context=max_goldens_per_context
+                        )
+                    )
+                finally:
+                    loop.close()
+            
+            # 在线程池中执行，避免阻塞
+            dataset: EvaluationDataset = await asyncio.to_thread(sync_generate_from_contexts)
             logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
@@ -201,13 +216,28 @@ class DeepEvalDatasetGenerator:
             styling_config.task = "基于文档内容生成中文问答对。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语。"
             self.synthesizer.styling_config = styling_config
             
-            # 使用DeepEval生成数据集
+            # 使用DeepEval生成数据集 - 在线程池中执行，避免阻塞主线程
             logger.info("开始调用DeepEval API生成文档问答对...")
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_docs(
-                document_paths=document_paths,
-                include_expected_output=True,
-                max_goldens_per_context=max_goldens_per_context
-            )
+            
+            # 创建一个同步包装函数
+            def sync_generate_from_docs():
+                import asyncio
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        self.synthesizer.a_generate_goldens_from_docs(
+                            document_paths=document_paths,
+                            include_expected_output=True,
+                            max_goldens_per_context=max_goldens_per_context
+                        )
+                    )
+                finally:
+                    loop.close()
+            
+            # 在线程池中执行，避免阻塞
+            dataset: EvaluationDataset = await asyncio.to_thread(sync_generate_from_docs)
             logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
@@ -277,34 +307,27 @@ class DeepEvalDatasetGenerator:
             logger.info("设置synthesizer的styling_config...")
             self.synthesizer.styling_config = styling_config
             
-            # 使用DeepEval生成数据集，添加错误处理和重试
+            # 使用DeepEval生成数据集 - 在线程池中执行，避免阻塞主线程
             logger.info("开始调用DeepEval API...")
-            max_retries = 3
-            for attempt in range(max_retries):
+            
+            # 创建一个同步包装函数
+            def sync_generate():
+                import asyncio
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
                 try:
-                    dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
-                        num_goldens=num_questions
+                    return loop.run_until_complete(
+                        self.synthesizer.a_generate_goldens_from_scratch(
+                            num_goldens=num_questions
+                        )
                     )
-                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
-                    break
-                except Exception as e:
-                    error_msg = str(e)
-                    logger.warning(f"DeepEval API调用失败 (尝试 {attempt + 1}/{max_retries}): {error_msg}")
-                    
-                    if "validation errors for SyntheticDataList" in error_msg:
-                        # 如果是数据格式问题，尝试减少生成数量
-                        if attempt < max_retries - 1:
-                            reduced_num = max(1, num_questions // 2)
-                            logger.info(f"尝试减少生成数量到 {reduced_num}")
-                            num_questions = reduced_num
-                            continue
-                    
-                    if attempt == max_retries - 1:
-                        logger.error(f"DeepEval API调用最终失败: {error_msg}")
-                        raise
-                    
-                    # 等待一段时间后重试
-                    await asyncio.sleep(2)
+                finally:
+                    loop.close()
+            
+            # 在线程池中执行，避免阻塞
+            dataset: EvaluationDataset = await asyncio.to_thread(sync_generate)
+            logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
             
             # 转换为我们的格式
             qa_items = []
@@ -362,13 +385,28 @@ class DeepEvalDatasetGenerator:
             # 计算每个Golden生成多少个新Golden
             max_goldens_per_golden = max(1, num_questions // len(goldens))
 
-            # 使用DeepEval的generate_goldens_from_goldens方法
+            # 使用DeepEval的generate_goldens_from_goldens方法 - 在线程池中执行，避免阻塞主线程
             logger.info(f"开始调用DeepEval a_generate_goldens_from_goldens，输入goldens数量: {len(goldens)}")
-            new_goldens = await self.synthesizer.a_generate_goldens_from_goldens(
-                goldens=goldens,
-                max_goldens_per_golden=max_goldens_per_golden,
-                include_expected_output=True
-            )
+            
+            # 创建一个同步包装函数
+            def sync_generate_from_goldens():
+                import asyncio
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        self.synthesizer.a_generate_goldens_from_goldens(
+                            goldens=goldens,
+                            max_goldens_per_golden=max_goldens_per_golden,
+                            include_expected_output=True
+                        )
+                    )
+                finally:
+                    loop.close()
+            
+            # 在线程池中执行，避免阻塞
+            new_goldens = await asyncio.to_thread(sync_generate_from_goldens)
             logger.info(f"DeepEval返回new_goldens数量: {len(new_goldens)}")
             
             # 转换为我们的格式

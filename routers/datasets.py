@@ -132,9 +132,12 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
         
         async def background_document_generation():
             try:
-                qa_items = await deepeval_generator.generate_from_documents(
-                    document_paths=[temp_path],
-                    num_questions=num_questions
+                # 在线程池中执行大模型调用，避免阻塞
+                qa_items = await asyncio.to_thread(
+                    lambda: asyncio.run(deepeval_generator.generate_from_documents(
+                        document_paths=[temp_path],
+                        num_questions=num_questions
+                    ))
                 )
                 
                 if not qa_items:
@@ -296,9 +299,12 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
         
         async def background_context_generation():
             try:
-                qa_items = await deepeval_generator.generate_from_contexts(
-                    contexts=payload.contexts,
-                    num_questions=payload.num_questions
+                # 在线程池中执行大模型调用，避免阻塞
+                qa_items = await asyncio.to_thread(
+                    lambda: asyncio.run(deepeval_generator.generate_from_contexts(
+                        contexts=payload.contexts,
+                        num_questions=payload.num_questions
+                    ))
                 )
 
                 # 检查DeepEval生成结果
@@ -425,10 +431,13 @@ async def process_topic_generation(task_id: int, topic: str, task_description: s
         
         async def background_generation():
             try:
-                qa_items = await deepeval_generator.generate_from_scratch(
-                    num_questions=num_questions,
-                    topic=topic,
-                    scenario=scene_description
+                # 在线程池中执行大模型调用，避免阻塞
+                qa_items = await asyncio.to_thread(
+                    lambda: asyncio.run(deepeval_generator.generate_from_scratch(
+                        num_questions=num_questions,
+                        topic=topic,
+                        scenario=scene_description
+                    ))
                 )
                 
                 if not qa_items:
@@ -591,9 +600,12 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
         
         async def background_augment_generation():
             try:
-                qa_items = await deepeval_generator.generate_from_goldens(
-                    goldens=goldens,
-                    num_questions=target_num
+                # 在线程池中执行大模型调用，避免阻塞
+                qa_items = await asyncio.to_thread(
+                    lambda: asyncio.run(deepeval_generator.generate_from_goldens(
+                        goldens=goldens,
+                        num_questions=target_num
+                    ))
                 )
                 
                 if not qa_items:
