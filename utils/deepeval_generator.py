@@ -38,18 +38,42 @@ class DeepEvalDatasetGenerator:
     
     def __init__(self):
         """初始化DeepEval数据集生成器"""
-        # 设置环境变量
-        os.environ["OPENAI_API_KEY"] = API_CONFIG['openai_api_key']
-        os.environ["OPENAI_BASE_URL"] = API_CONFIG['openai_base_url']
-        
-        # 初始化Synthesizer
-        self.synthesizer = Synthesizer(
-            model=API_CONFIG['openai_model'],
-            async_mode=True,
-            max_concurrent=10
-        )
-
-        logger.info(f"DeepEval数据集生成器初始化完成，使用模型: {API_CONFIG['openai_model']}")
+        try:
+            logger.info("开始初始化DeepEval数据集生成器...")
+            
+            # 设置环境变量
+            os.environ["OPENAI_API_KEY"] = API_CONFIG['openai_api_key']
+            os.environ["OPENAI_BASE_URL"] = API_CONFIG['openai_base_url']
+            
+            logger.info(f"API配置: {API_CONFIG['openai_base_url']}")
+            logger.info(f"并发数: {API_CONFIG.get('max_concurrent', 10)}, 超时: {API_CONFIG.get('timeout', 30)}秒, 重试: {API_CONFIG.get('max_retries', 2)}次")
+            
+            # 初始化Synthesizer
+            logger.info("开始创建Synthesizer实例...")
+            self.synthesizer = Synthesizer(
+                model=API_CONFIG['openai_model'],
+                async_mode=True,
+                max_concurrent=1,  # 降低并发数，避免过载
+                cost_tracking=False
+            )
+            
+            # 设置默认的styling_config
+            from deepeval.synthesizer.config import StylingConfig
+            default_styling_config = StylingConfig(
+                scenario="educational",
+                task="question answering",
+                input_format="text",
+                expected_output_format="text"
+            )
+            self.synthesizer.styling_config = default_styling_config
+            
+            logger.info(f"DeepEval数据集生成器初始化完成，使用模型: {API_CONFIG['openai_model']}")
+            
+        except Exception as e:
+            logger.error(f"DeepEval数据集生成器初始化失败: {str(e)}")
+            import traceback
+            logger.error(f"初始化错误详情: {traceback.format_exc()}")
+            raise
     
     def _prepare_contexts_with_instruction(self, contexts: List[str]) -> List[List[str]]:
         """为上下文添加推理指示"""
@@ -105,11 +129,33 @@ class DeepEvalDatasetGenerator:
             self.synthesizer.styling_config = styling_config
 
             # 使用DeepEval一次性生成所有问答对
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_contexts(
-                contexts=contexts_with_instruction,
-                include_expected_output=True,
-                max_goldens_per_context=max_goldens_per_context
-            )
+            logger.info("开始调用DeepEval API生成问答对...")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
+                    dataset: EvaluationDataset = await asyncio.wait_for(
+                        self.synthesizer.a_generate_goldens_from_contexts(
+                            contexts=contexts_with_instruction,
+                            include_expected_output=True,
+                            max_goldens_per_context=max_goldens_per_context
+                        ),
+                        timeout=120  # 2分钟超时
+                    )
+                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
+                    break
+                except asyncio.TimeoutError:
+                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
+                    if attempt == max_retries - 1:
+                        raise Exception("DeepEval API调用超时，请检查网络连接")
+                    await asyncio.sleep(2)  # 等待2秒后重试
+                except Exception as e:
+                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
+                    import traceback
+                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(2)  # 等待2秒后重试
             
             # 转换为我们的格式
             qa_items = []
@@ -142,6 +188,8 @@ class DeepEvalDatasetGenerator:
             
         except Exception as e:
             logger.error(f"DeepEval生成失败: {str(e)}")
+            import traceback
+            logger.error(f"上下文生成错误详情: {traceback.format_exc()}")
             raise
 
     async def generate_from_documents(
@@ -174,11 +222,33 @@ class DeepEvalDatasetGenerator:
             self.synthesizer.styling_config = styling_config
             
             # 使用DeepEval生成数据集
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_docs(
-                document_paths=document_paths,
-                include_expected_output=True,
-                max_goldens_per_context=max_goldens_per_context
-            )
+            logger.info("开始调用DeepEval API生成文档问答对...")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
+                    dataset: EvaluationDataset = await asyncio.wait_for(
+                        self.synthesizer.a_generate_goldens_from_docs(
+                            document_paths=document_paths,
+                            include_expected_output=True,
+                            max_goldens_per_context=max_goldens_per_context
+                        ),
+                        timeout=120  # 2分钟超时
+                    )
+                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
+                    break
+                except asyncio.TimeoutError:
+                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
+                    if attempt == max_retries - 1:
+                        raise Exception("DeepEval API调用超时，请检查网络连接")
+                    await asyncio.sleep(2)  # 等待2秒后重试
+                except Exception as e:
+                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
+                    import traceback
+                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(2)  # 等待2秒后重试
             
             # 转换为我们的格式
             qa_items = []
@@ -208,6 +278,8 @@ class DeepEvalDatasetGenerator:
             
         except Exception as e:
             logger.error(f"DeepEval文档生成失败: {str(e)}")
+            import traceback
+            logger.error(f"文档生成错误详情: {traceback.format_exc()}")
             raise
     
     async def generate_from_scratch(
@@ -231,21 +303,46 @@ class DeepEvalDatasetGenerator:
             logger.info(f"开始使用DeepEval从零生成数据集: 问题数量={num_questions}, 主题={topic}")
 
             # 创建风格配置并设置到 synthesizer
+            logger.info("开始创建styling_config...")
             styling_config = self._create_styling_config(scenario)
             
             # 如果有主题信息，修改任务描述
             if topic:
+                logger.info(f"设置主题相关配置: {topic}")
                 styling_config.task = f"基于主题'{topic}'生成中文问题和答案。严格要求：1. 问题必须用中文提问；2. 答案必须用中文回答；3. 内容要符合中文表达习惯；4. 不要生成任何英文内容；5. 所有文本必须是中文；6. 禁止使用英文单词或短语；7. 问题必须以中文开头，不能以英文开头；8. 绝对不允许生成英文问题；9. 问题必须以'什么是'、'如何'、'为什么'、'请解释'等中文词汇开头；10. 禁止使用任何英文单词，包括技术术语也要用中文表达。"
                 styling_config.scenario = f"关于{topic}的中文教育问答"
                 styling_config.input_format = "中文问题，必须以中文开头，不能包含英文"
                 styling_config.expected_output_format = "中文答案，必须用中文回答，不能包含英文"
 
+            logger.info("设置synthesizer的styling_config...")
             self.synthesizer.styling_config = styling_config
             
-            # 使用DeepEval生成数据集
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
-                num_goldens=num_questions
-            )
+            # 使用DeepEval生成数据集，添加重试机制
+            logger.info("开始调用DeepEval API...")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"DeepEval API调用尝试 {attempt + 1}/{max_retries}")
+                    dataset: EvaluationDataset = await asyncio.wait_for(
+                        self.synthesizer.a_generate_goldens_from_scratch(
+                            num_goldens=num_questions
+                        ),
+                        timeout=120  # 2分钟超时
+                    )
+                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
+                    break
+                except asyncio.TimeoutError:
+                    logger.error(f"DeepEval API调用超时，尝试 {attempt + 1}/{max_retries}")
+                    if attempt == max_retries - 1:
+                        raise Exception("DeepEval API调用超时，请检查网络连接")
+                    await asyncio.sleep(2)  # 等待2秒后重试
+                except Exception as e:
+                    logger.error(f"DeepEval API调用失败，尝试 {attempt + 1}/{max_retries}: {str(e)}")
+                    import traceback
+                    logger.error(f"API调用错误详情: {traceback.format_exc()}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(2)  # 等待2秒后重试
             
             # 转换为我们的格式
             qa_items = []
@@ -269,6 +366,8 @@ class DeepEvalDatasetGenerator:
             
         except Exception as e:
             logger.error(f"DeepEval从零生成失败: {str(e)}")
+            import traceback
+            logger.error(f"从零生成错误详情: {traceback.format_exc()}")
             raise
     
     async def generate_from_goldens(
