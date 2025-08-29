@@ -162,7 +162,7 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
                 # 异步创建目录和写入文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
                 await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8').write(csv_content)
+                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
                 )
 
                 # 生成 preview JSON 数据，取前几条数据
@@ -341,7 +341,7 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
                 # 异步创建目录和保存CSV文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
                 await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8').write(csv_content)
+                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
                 )
 
                 # 更新任务状态为完成
@@ -463,7 +463,7 @@ async def process_topic_generation(task_id: int, topic: str, task_description: s
                 # 异步创建目录和写入文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
                 await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8').write(csv_content)
+                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
                 )
 
                 # 生成 preview JSON 数组，取前几条数据的问题
@@ -629,7 +629,7 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
                 
                 def write_csv():
-                    with open(output_path, 'w', encoding='utf-8', newline='') as f:
+                    with open(output_path, 'w', encoding='utf-8-sig', newline='') as f:
                         writer = csv.writer(f)
                         writer.writerow(['input', 'expected_output'])
                         for it in augment_items:
