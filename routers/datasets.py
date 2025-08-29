@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from database import TaskManager
 from datetime import datetime
 from config import FILE_CONFIG, PREVIEW_CONFIG
+import pandas as pd
 
 # 确保使用源码路径导入 DeepEval
 DEEPEVAL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deepeval_source')
@@ -45,24 +46,18 @@ def generate_task_name(generation_type: str) -> str:
     timestamp = datetime.now().strftime("%Y%m%d%H%M")
     return f"generation_datasets_from_{generation_type}_{timestamp}"
 
-def write_qa_to_csv(items: List[QAItem]) -> str:
-    """将问答对写入CSV格式"""
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # 写入表头
-    writer.writerow(['question', 'expected_output', 'context', 'context_length'])
-    
-    # 写入数据
+def save_qa_csv_with_pandas(items: List[QAItem], output_path: str) -> None:
+    """使用 pandas 保存问答对为 CSV，确保 Windows/macOS 兼容。"""
+    rows = []
     for item in items:
-        writer.writerow([
-            item.question,
-            item.expected_output,
-            ';'.join(item.context) if item.context else '',
-            item.context_length
-        ])
-    
-    return output.getvalue()
+        rows.append({
+            'question': item.question,
+            'expected_output': item.expected_output,
+            'context': ';'.join(item.context) if item.context else '',
+            'context_length': item.context_length,
+        })
+    df = pd.DataFrame(rows, columns=['question', 'expected_output', 'context', 'context_length'])
+    df.to_csv(output_path, index=False, encoding='utf-8-sig', line_terminator='\r\n')
 
 
 @router.post("/from-document", summary="根据文档生成数据集（异步）")
@@ -154,16 +149,13 @@ async def process_document_generation(task_id: int, filename: str, content_bytes
                         context_length=item.get('context_length', 0)
                     ))
 
-                # 异步保存CSV
-                csv_content = write_qa_to_csv(final_items)
+                # 异步保存CSV（pandas，Windows/mac 双兼容）
                 out_filename = f"document_qa_dataset_{timestamp}.csv"
                 output_path = f"{FILE_CONFIG['output_dir']}/{out_filename}"
                 
                 # 异步创建目录和写入文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
-                await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
-                )
+                await asyncio.to_thread(save_qa_csv_with_pandas, final_items, output_path)
 
                 # 生成 preview JSON 数据，取前几条数据
                 logger.info(f"开始生成 preview，final_items 数量: {len(final_items)}")
@@ -332,17 +324,14 @@ async def process_context_generation(task_id: int, payload: FromContextRequest):
                     )
                     final_items.append(qa_item)
 
-                # 生成CSV文件
-                csv_content = write_qa_to_csv(final_items)
+                # 生成CSV文件（pandas，Windows/mac 双兼容）
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"context_qa_dataset_{timestamp}.csv"
                 output_path = f"{FILE_CONFIG['output_dir']}/{filename}"
 
                 # 异步创建目录和保存CSV文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
-                await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
-                )
+                await asyncio.to_thread(save_qa_csv_with_pandas, final_items, output_path)
 
                 # 更新任务状态为完成
                 preview_text = ""
@@ -454,17 +443,14 @@ async def process_topic_generation(task_id: int, topic: str, task_description: s
                         context_length=len(topic)
                     ))
 
-                # 异步保存CSV
-                csv_content = write_qa_to_csv(final_items)
+                # 异步保存CSV（pandas，Windows/mac 双兼容）
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"topic_qa_dataset_{timestamp}.csv"
                 output_path = f"{FILE_CONFIG['output_dir']}/{filename}"
                 
                 # 异步创建目录和写入文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
-                await asyncio.to_thread(
-                    lambda: open(output_path, 'w', encoding='utf-8-sig').write(csv_content)
-                )
+                await asyncio.to_thread(save_qa_csv_with_pandas, final_items, output_path)
 
                 # 生成 preview JSON 数组，取前几条数据的问题
                 preview_data = []
@@ -628,14 +614,17 @@ async def process_augment_generation(task_id: int, contexts: List[str], target_n
                 # 异步创建目录和写入文件
                 await asyncio.to_thread(os.makedirs, FILE_CONFIG['output_dir'], exist_ok=True)
                 
-                def write_csv():
-                    with open(output_path, 'w', encoding='utf-8-sig', newline='') as f:
-                        writer = csv.writer(f)
-                        writer.writerow(['input', 'expected_output'])
-                        for it in augment_items:
-                            writer.writerow([it.input, it.expected_output or ''])
-                
-                await asyncio.to_thread(write_csv)
+                # 使用 pandas 保存（Windows/mac 双兼容）
+                def write_csv_with_pandas():
+                    import pandas as pd
+                    rows = [{
+                        'input': it.input,
+                        'expected_output': it.expected_output or ''
+                    } for it in augment_items]
+                    df = pd.DataFrame(rows, columns=['input', 'expected_output'])
+                    df.to_csv(output_path, index=False, encoding='utf-8-sig', line_terminator='\r\n')
+
+                await asyncio.to_thread(write_csv_with_pandas)
 
                 # 生成 preview JSON 对象，取前几条数据
                 preview_data = []
