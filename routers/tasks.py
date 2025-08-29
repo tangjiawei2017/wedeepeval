@@ -54,7 +54,7 @@ async def get_all_tasks():
     获取所有任务列表
     """
     try:
-        task_manager = TaskManager()
+        task_manager = get_task_manager()
         tasks = task_manager.get_all_tasks()
         
         # 处理每个任务的时间格式
@@ -69,13 +69,23 @@ async def get_all_tasks():
     except Exception as e:
         return error(message=f"获取任务列表失败: {str(e)}", code=500)
 
+# 全局TaskManager实例
+_task_manager = None
+
+def get_task_manager():
+    """获取全局TaskManager实例"""
+    global _task_manager
+    if _task_manager is None:
+        _task_manager = TaskManager()
+    return _task_manager
+
 @router.get("/{task_id}", summary="获取指定任务")
 async def get_task(task_id: int):
     """
     根据任务ID获取任务详情
     """
     try:
-        task_manager = TaskManager()
+        task_manager = get_task_manager()
         task = task_manager.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
@@ -106,7 +116,7 @@ async def download_task_file(task_id: int):
     """
     try:
         # 获取任务信息
-        task_manager = TaskManager()
+        task_manager = get_task_manager()
         task = task_manager.get_task_by_id(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
@@ -120,8 +130,8 @@ async def download_task_file(task_id: int):
         if not output_file_path:
             raise HTTPException(status_code=404, detail="任务没有生成文件")
         
-        # 检查文件是否存在
-        if not os.path.exists(output_file_path):
+        # 异步检查文件是否存在
+        if not await asyncio.to_thread(os.path.exists, output_file_path):
             raise HTTPException(status_code=404, detail="文件不存在")
         
         # 获取文件名

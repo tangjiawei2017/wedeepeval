@@ -11,6 +11,19 @@ logger = get_logger('task_manager', 'business')
 class TaskManager(DatabaseManager):
     """任务数据库管理器"""
     
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(TaskManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if not self._initialized:
+            super().__init__()
+            self._initialized = True
+    
     def create_task(self, task_name: str, generation_type: str, total_items: int = 0, preview: str = None) -> Optional[int]:
         """创建新任务"""
         try:
@@ -87,7 +100,7 @@ class TaskManager(DatabaseManager):
         try:
             task = self.db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
             if task:
-                logger.info(f"获取任务成功: ID={task_id}")
+                # 减少日志记录，提高性能
                 return task.to_dict()
             else:
                 logger.warning(f"任务不存在: ID={task_id}")

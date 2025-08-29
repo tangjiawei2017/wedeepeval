@@ -53,7 +53,7 @@ class DeepEvalDatasetGenerator:
             self.synthesizer = Synthesizer(
                 model=API_CONFIG['openai_model'],
                 async_mode=True,
-                max_concurrent=1,  # 降低并发数，避免过载
+                max_concurrent=5,  # 增加并发数，提高性能
                 cost_tracking=False
             )
             
@@ -277,12 +277,34 @@ class DeepEvalDatasetGenerator:
             logger.info("设置synthesizer的styling_config...")
             self.synthesizer.styling_config = styling_config
             
-            # 使用DeepEval生成数据集
+            # 使用DeepEval生成数据集，添加错误处理和重试
             logger.info("开始调用DeepEval API...")
-            dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
-                num_goldens=num_questions
-            )
-            logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    dataset: EvaluationDataset = await self.synthesizer.a_generate_goldens_from_scratch(
+                        num_goldens=num_questions
+                    )
+                    logger.info(f"DeepEval API调用成功，生成 {len(dataset)} 个结果")
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.warning(f"DeepEval API调用失败 (尝试 {attempt + 1}/{max_retries}): {error_msg}")
+                    
+                    if "validation errors for SyntheticDataList" in error_msg:
+                        # 如果是数据格式问题，尝试减少生成数量
+                        if attempt < max_retries - 1:
+                            reduced_num = max(1, num_questions // 2)
+                            logger.info(f"尝试减少生成数量到 {reduced_num}")
+                            num_questions = reduced_num
+                            continue
+                    
+                    if attempt == max_retries - 1:
+                        logger.error(f"DeepEval API调用最终失败: {error_msg}")
+                        raise
+                    
+                    # 等待一段时间后重试
+                    await asyncio.sleep(2)
             
             # 转换为我们的格式
             qa_items = []
